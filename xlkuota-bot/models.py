@@ -1,23 +1,29 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
 
 Base = declarative_base()
 
 class Member(Base):
-    __tablename__ = 'members'
+    __tablename__ = "members"
+
     id = Column(Integer, primary_key=True)
-    telegram_id = Column(String, unique=True)
-    otp = Column(String)
-    otp_expiry = Column(DateTime)
+    telegram_id = Column(String, unique=True, index=True)
+    username = Column(String)
+    otp = Column(String, nullable=True)
+    verified = Column(Boolean, default=False)
     saldo = Column(Float, default=0)
     transaksi = Column(Integer, default=0)
-    verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-class Transaction(Base):
-    __tablename__ = 'transactions'
+class Topup(Base):
+    __tablename__ = "topups"
+
     id = Column(Integer, primary_key=True)
-    member_id = Column(Integer)
-    product = Column(String)
-    amount = Column(Float)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    member_id = Column(Integer, ForeignKey("members.id"))
+    trx_code = Column(String, unique=True, index=True)
+    amount = Column(Float, nullable=True)
+    status = Column(String, default="pending")  # pending, success, rejected
+    bukti_file_id = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    verified_at = Column(DateTime, nullable=True)
