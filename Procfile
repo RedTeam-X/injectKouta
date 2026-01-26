@@ -1,1 +1,1 @@
-web: python reseller-provider/bot.py
+web: python xlkuota-bot/bot.py
