@@ -27,3 +27,15 @@ class Topup(Base):
     bukti_file_id = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     verified_at = Column(DateTime, nullable=True)
+
+class Purchase(Base):
+    __tablename__ = "purchases"
+
+    id = Column(Integer, primary_key=True)
+    member_id = Column(Integer, ForeignKey("members.id"))
+    trx_code = Column(String, unique=True, index=True)
+    product_name = Column(String)
+    price = Column(Float)
+    status = Column(String, default="pending")  # pending, success, rejected
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    verified_at = Column(DateTime, nullable=True)
