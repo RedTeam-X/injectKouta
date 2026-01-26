@@ -2,6 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base
 
-engine = create_engine('sqlite:///xl.db')
+# SQLite lokal (Railway juga bisa pakai ini untuk awal)
+engine = create_engine("sqlite:///xlkuota.db")
 Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
+
+SessionLocal = sessionmaker(bind=engine)
