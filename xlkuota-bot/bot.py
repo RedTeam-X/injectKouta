@@ -1,54 +1,68 @@
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from db import Session
-from models import Member
-from config import BOT_TOKEN, OTP_EXPIRY, MIN_TOPUP, ADMIN_CHAT_ID
-import random, datetime, json
+import random
 
+BOT_TOKEN = "8544774444:AAH13JEgpbPZfBEdgO6KProb9sSENAWCxFA"
+
+# Simulasi database user
+users = {}
+
+# Produk sesuai flowchart (disingkat)
+PRODUCTS = [
+    "XL XTRA KOUTA CONF 2GB, 1HR Rp.5000",
+    "XL XTRA KOUTA YT 2GB, 3HR Rp.7000",
+    "XL XTRA KOUTA INSTAGRAM 3GB, 7HR Rp.10.000"
+]
+
+# === START COMMAND ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    session = Session()
-    member = session.query(Member).filter_by(telegram_id=telegram_id).first()
-    if not member:
+    keyboard = [["XL Dor", "Login", "PPOB"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("📲 Silakan pilih menu:", reply_markup=reply_markup)
+
+# === HANDLE BUTTON ===
+async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    choice = update.message.text
+
+    # XL Dor
+    if choice == "XL Dor":
+        if uid not in users or not users[uid].get("verified", False):
+            await update.message.reply_text("❌ Kamu harus login dulu sebelum membeli produk.")
+        else:
+            msg = "📦 List Produk XL:\n"
+            for p in PRODUCTS:
+                msg += f"- {p}\n"
+            await update.message.reply_text(msg)
+
+    # Login
+    elif choice == "Login":
         otp = str(random.randint(100000, 999999))
-        expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=OTP_EXPIRY)
-        member = Member(telegram_id=telegram_id, otp=otp, otp_expiry=expiry)
-        session.add(member)
-        session.commit()
-        await update.message.reply_text(f"Kode OTP kamu: {otp}\nKirim kode ini untuk login.")
-    else:
-        await update.message.reply_text("Kamu sudah terdaftar. Kirim OTP untuk login.")
+        users[uid] = {"otp": otp, "verified": False, "saldo": 0, "trx": 0}
+        # Kirim OTP ke user via DM (private chat)
+        await context.bot.send_message(chat_id=uid, text=f"🔐 Kode OTP kamu: {otp}\nKirim kode ini di chat bot untuk login.")
+        await update.message.reply_text("📩 OTP sudah dikirim ke akun Telegram kamu.")
 
-async def otp_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    otp_input = update.message.text.strip()
-    telegram_id = str(update.effective_user.id)
-    session = Session()
-    member = session.query(Member).filter_by(telegram_id=telegram_id).first()
-    if member and member.otp == otp_input and datetime.datetime.utcnow() < member.otp_expiry:
-        member.verified = True
-        session.commit()
-        await update.message.reply_text("✅ Login berhasil! Ketik /menu untuk melihat produk.")
-    else:
-        await update.message.reply_text("❌ OTP salah atau kadaluarsa.")
+    # PPOB
+    elif choice == "PPOB":
+        await update.message.reply_text("⚠️ Menu PPOB masih *Coming Soon*.")
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    session = Session()
-    member = session.query(Member).filter_by(telegram_id=telegram_id).first()
-    if not member or not member.verified:
-        await update.message.reply_text("Kamu harus login dulu dengan OTP.")
-        return
-    with open("templates/menu.json") as f:
-        menu_data = json.load(f)
-    msg = "📦 Menu Produk XL:\n"
-    for kategori, items in menu_data.items():
-        msg += f"\n*{kategori}*\n"
-        for item in items:
-            msg += f"• {item}\n"
-    await update.message.reply_text(msg)
+    # OTP Input
+    elif choice.isdigit():
+        if uid in users and users[uid]["otp"] == choice:
+            users[uid]["verified"] = True
+            await update.message.reply_text(f"""
+✅ Login berhasil!
+📊 Dashboard Member:
+- Nama Akun: {update.effective_user.username}
+- Saldo: Rp{users[uid]['saldo']}
+- Jumlah Transaksi: {users[uid]['trx']}
+- Minimal Top-Up: Rp20.000
+""")
+        else:
+            await update.message.reply_text("❌ OTP salah atau kadaluarsa. Klik Login untuk minta ulang.")
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("menu", menu))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, otp_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
 app.run_polling()
