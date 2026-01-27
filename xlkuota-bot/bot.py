@@ -32,7 +32,12 @@ PRODUCTS = {
         ("XTRA COMBO VIP 5GB+10GB YT+20mnt", 66000),
         ("XTRA COMBO VIP 10GB+20GB YT+30mnt", 94000),
         ("XTRA COMBO VIP 15GB+30GB YT+40mnt", 131000)
-    ]
+    ],
+    "Note": [
+        bersifat extra, pembelian produk Xtra digital
+        di nomer yang dituju harus aktif kuota utama atau seperti Xtra Combo VIP, 
+        Xtra Combo, Xtra Combo Lite / Xtra Combo Flex ,HotRod Xtra dan HotRod Xtra Plus
+    ] 
 }
 
 # ================== MENU UTAMA ==================
