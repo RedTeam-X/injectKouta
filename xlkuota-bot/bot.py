@@ -3,7 +3,9 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, ContextTypes
 )
-import random, datetime, os
+import random
+import datetime
+import os
 
 from config import BOT_TOKEN, ADMIN_CHAT_ID, MIN_TOPUP, QRIS_IMAGE_PATH
 from db import SessionLocal
@@ -74,12 +76,26 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     tg_user = update.effective_user
     member = get_or_create_member(session, tg_user)
-
     state = context.user_data.get("state")
 
-    # ========== STATE: PILIH KATEGORI ==========
+    # ---------- STATE: PILIH KATEGORI ----------
     if state == "pilih_kategori":
         if text in PRODUCTS:
+            if text == "XL XTRA DIGITAL":
+                await update.message.reply_text(
+                    "⚠️ *Catatan Penting Xtra Digital*\n\n"
+                    "Kuota Xtra Digital bersifat *extra* (tambahan), bukan kuota utama.\n\n"
+                    "Agar kuota dapat masuk, nomor tujuan WAJIB memiliki salah satu paket aktif berikut:\n"
+                    "• Xtra Combo VIP\n"
+                    "• Xtra Combo\n"
+                    "• Xtra Combo Lite\n"
+                    "• Xtra Combo Flex\n"
+                    "• HotRod Xtra\n"
+                    "• HotRod Xtra Plus\n\n"
+                    "Jika nomor tidak memiliki paket utama di atas, kuota Xtra Digital TIDAK BISA MASUK.",
+                    parse_mode="Markdown"
+                )
+
             items = PRODUCTS[text]
             item_buttons = [[p[0]] for p in items]
             reply = ReplyKeyboardMarkup(item_buttons + [["⬅️ Kembali"]], resize_keyboard=True)
@@ -95,7 +111,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["state"] = None
             return
 
-    # ========== STATE: PILIH ITEM ==========
+    # ---------- STATE: PILIH ITEM ----------
     if state == "pilih_item":
         kategori = context.user_data.get("kategori")
 
@@ -106,18 +122,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📦 Pilih kategori produk XL:", reply_markup=reply)
             return
 
-        # cari item
         if kategori in PRODUCTS:
             for nama, harga in PRODUCTS[kategori]:
                 if nama == text:
-                    # cek saldo cukup atau tidak
                     if member.saldo < harga:
                         await update.message.reply_text(
                             f"❌ Saldo tidak cukup.\nSaldo kamu: Rp{int(member.saldo)}\nHarga: Rp{harga}"
                         )
                         return
 
-                    # saldo cukup → generate kode pembelian, TAPI saldo belum dipotong
                     trx_code = f"BUY-{member.id}-{int(datetime.datetime.utcnow().timestamp())}"
 
                     pembelian = Purchase(
@@ -130,24 +143,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session.add(pembelian)
                     session.commit()
 
-                    # kirim bukti transaksi ke admin
                     await update.message.reply_text(
-                        f"📨 Permintaan pembelian dikirim ke admin.\n"
-                        f"Menunggu admin mengirimkan kuota dan verifikasi.",
+                        "📨 Permintaan pembelian dikirim ke admin.\n"
+                        "Admin akan mengirimkan kuota secara manual dan memverifikasi transaksi.",
                         reply_markup=main_menu_keyboard()
                     )
 
                     await context.bot.send_message(
                         chat_id=ADMIN_CHAT_ID,
                         text=(
-                            f"🧾 *Transaksi Pembelian Baru*\n"
+                            "🧾 *Transaksi Pembelian Baru*\n"
                             f"ID: `{trx_code}`\n"
                             f"User: {member.username} (ID: {member.telegram_id})\n"
                             f"Produk: {nama}\n"
                             f"Harga: Rp{harga}\n\n"
-                            f"Setelah kuota dikirim ke user, gunakan:\n"
+                            "Setelah kuota dikirim ke user, gunakan:\n"
                             f"/approve_beli {trx_code}\n"
-                            f"Jika batal, gunakan:\n"
+                            "Jika batal, gunakan:\n"
                             f"/reject_beli {trx_code}"
                         ),
                         parse_mode="Markdown"
@@ -159,7 +171,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Item tidak ditemukan.")
         return
 
-    # ========== XL DOR ==========
+    # ---------- XL DOR ----------
     if text == "XL Dor":
         if not member.verified:
             await update.message.reply_text("❌ Kamu harus login dulu sebelum membeli produk.")
@@ -172,7 +184,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = "pilih_kategori"
         return
 
-    # ========== LOGIN ==========
+    # ---------- LOGIN ----------
     if text == "Login":
         if member.verified:
             await update.message.reply_text("✅ Kamu sudah login.", reply_markup=main_menu_keyboard())
@@ -189,12 +201,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📩 OTP sudah dikirim ke akun Telegram kamu.")
         return
 
-    # ========== PPOB ==========
+    # ---------- PPOB ----------
     if text == "PPOB":
         await update.message.reply_text("⚠️ Menu PPOB masih *Coming Soon*.", parse_mode="Markdown")
         return
 
-    # ========== TOP UP ==========
+    # ---------- TOP UP ----------
     if text == "Top Up":
         if not member.verified:
             await update.message.reply_text("❌ Kamu harus login dulu.")
@@ -219,14 +231,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["topup_mode"] = True
         return
 
-    # ========== OTP VALIDASI ==========
+    # ---------- OTP VALIDASI ----------
     if text.isdigit() and member.otp == text and not member.verified:
         member.verified = True
         member.otp = None
         session.commit()
 
         await update.message.reply_text(
-            f"✅ Login berhasil!\n\n"
+            "✅ Login berhasil!\n\n"
             f"📊 Dashboard Member:\n"
             f"- Nama Akun: {member.username}\n"
             f"- Saldo: Rp{int(member.saldo)}\n"
@@ -279,13 +291,13 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=ADMIN_CHAT_ID,
         photo=file_id,
         caption=(
-            f"📥 *Transaksi Top-Up Baru*\n"
+            "📥 *Transaksi Top-Up Baru*\n"
             f"ID: `{topup.trx_code}`\n"
             f"User: {member.username} (ID: {member.telegram_id})\n\n"
-            f"Gunakan format:\n"
+            "Gunakan format:\n"
             f"/approve_topup {topup.trx_code} <jumlah>\n"
             f"contoh: /approve_topup {topup.trx_code} 50000\n"
-            f"Untuk batal:\n"
+            "Untuk batal:\n"
             f"/reject_topup {topup.trx_code}"
         ),
         parse_mode="Markdown"
@@ -411,7 +423,6 @@ async def approve_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Member tidak ditemukan.")
         return
 
-    # cek saldo lagi sebelum potong (jaga-jaga)
     if member.saldo < pembelian.price:
         pembelian.status = "rejected"
         pembelian.verified_at = datetime.datetime.utcnow()
@@ -423,7 +434,6 @@ async def approve_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # potong saldo saat admin approve
     member.saldo -= pembelian.price
     member.transaksi += 1
     pembelian.status = "success"
