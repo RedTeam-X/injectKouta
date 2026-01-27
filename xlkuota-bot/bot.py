@@ -186,12 +186,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = "pilih_kategori"
         return
 
-    # ---------- LOGIN ----------
+# ---------- LOGIN ----------
     if text == "Login":
+        # Kalau sudah terverifikasi, selalu tampilkan dashboard
         if member.verified:
-            await update.message.reply_text("✅ Kamu sudah login.", reply_markup=main_menu_keyboard())
+            await update.message.reply_text(
+                "✅ Kamu sudah login.\n\n"
+                f"📊 Dashboard Member:\n"
+                f"- Nama Akun: {member.username}\n"
+                f"- Saldo: Rp{int(member.saldo)}\n"
+                f"- Jumlah Transaksi: {member.transaksi}\n"
+                f"- Minimal Top-Up: Rp{MIN_TOPUP}",
+                reply_markup=main_menu_keyboard()
+            )
             return
 
+        # Kalau belum verified → kirim OTP
         otp = str(random.randint(100000, 999999))
         member.otp = otp
         member.otp_created_at = datetime.datetime.utcnow()
@@ -203,11 +213,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text("📩 OTP sudah dikirim ke akun Telegram kamu.")
-        return
-
-    # ---------- PPOB ----------
-    if text == "PPOB":
-        await update.message.reply_text("⚠️ Menu PPOB masih *Coming Soon*.", parse_mode="Markdown")
         return
 
     # ---------- TOP UP ----------
