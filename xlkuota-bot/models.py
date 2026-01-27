@@ -1,6 +1,6 @@
+import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-import datetime
 
 Base = declarative_base()
 
@@ -11,6 +11,7 @@ class Member(Base):
     telegram_id = Column(String, unique=True, index=True)
     username = Column(String)
     otp = Column(String, nullable=True)
+    otp_created_at = Column(DateTime, nullable=True)
     verified = Column(Boolean, default=False)
     saldo = Column(Float, default=0)
     transaksi = Column(Integer, default=0)
