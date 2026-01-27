@@ -13,7 +13,7 @@ from config import BOTTOKEN, ADMINCHATID, MINTOPUP, QRISIMAGEPATH
 from db import SessionLocal
 from models import Member, Topup, Purchase, Report, MessageLog
 
-================== KONSTAN & STATE ==================
+#================== KONSTAN & STATE ==================#
 
 STATE_NONE = None
 STATEPILIHKATEGORI = "pilih_kategori"
