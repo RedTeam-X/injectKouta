@@ -11,18 +11,23 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import BOT_TOKEN, ADMIN_CHAT_ID, MIN_TOPUP, QRIS_IMAGE_PATH
 from db import SessionLocal
-from models import Member, Topup, Purchase
+from models import Member, Topup, Purchase, Report, MessageLog
 
-# ================== KONSTAN & MENU ==================
+# ================== KONSTAN & STATE ==================
 
 STATE_NONE = None
 STATE_PILIH_KATEGORI = "pilih_kategori"
 STATE_PILIH_ITEM = "pilih_item"
 STATE_MINTA_NOMOR = "minta_nomor"
+STATE_LAPOR_BUG = "lapor_bug"
+STATE_HUBUNGI_ADMIN = "hubungi_admin"
 
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
-        [["XL Dor", "Login", "PPOB"], ["Top Up"]],
+        [
+            ["XL Dor", "Login", "PPOB"],
+            ["Top Up", "Lapor Masalah", "Hubungi Admin"]
+        ],
         resize_keyboard=True
     )
 
@@ -76,7 +81,7 @@ def generate_bukti_topup_image(trx_code, username, telegram_id):
     draw.text((50, 200), f"User        : {username}", fill="black", font=font)
     draw.text((50, 250), f"Telegram ID : {telegram_id}", fill="black", font=font)
     draw.text((50, 350), "Silakan verifikasi apakah bukti transfer valid.", fill="black", font=font)
-    draw.text((50, 400), "SanStore", fill="gray", font=font)
+    draw.text((50, 420), "SanStore", fill="gray", font=font)
 
     path = f"bukti_{trx_code}.png"
     img.save(path)
@@ -86,7 +91,17 @@ def is_valid_phone(number: str) -> bool:
     number = number.strip()
     return number.isdigit() and 10 <= len(number) <= 15
 
-# ================== HANDLER START ==================
+def auto_tag_report(text: str) -> str:
+    t = text.lower()
+    if any(k in t for k in ["bug", "error", "gak jalan", "ga jalan", "crash", "traceback"]):
+        return "BUG"
+    if any(k in t for k in ["saran", "suggest", "ide", "fitur baru"]):
+        return "SUGGESTION"
+    if any(k in t for k in ["gagal", "tidak bisa", "masalah", "trouble"]):
+        return "ERROR"
+    return "BUG"  # default aman
+
+# ================== START ==================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["state"] = STATE_NONE
@@ -96,7 +111,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu_keyboard()
     )
 
-# ================== HANDLER TEKS ==================
+# ================== HANDLE TEKS ==================
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = SessionLocal()
@@ -104,6 +119,76 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tg_user = update.effective_user
     member = get_or_create_member(session, tg_user)
     state = context.user_data.get("state", STATE_NONE)
+
+    # ---------- STATE: LAPOR BUG / MASALAH ----------
+    if state == STATE_LAPOR_BUG:
+        laporan = text
+        kategori = auto_tag_report(laporan)
+
+        # simpan ke DB
+        report = Report(
+            member_id=member.id,
+            category=kategori,
+            message=laporan,
+            created_at=datetime.datetime.utcnow()
+        )
+        session.add(report)
+        session.commit()
+
+        # kirim ke admin
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                "🐞 *Laporan Baru dari User*\n"
+                f"Kategori: {kategori}\n"
+                f"User: {member.username} (ID: {member.telegram_id})\n\n"
+                f"Isi laporan:\n{laporan}"
+            ),
+            parse_mode="Markdown"
+        )
+
+        await update.message.reply_text(
+            "✅ Laporan kamu sudah dikirim ke admin.\nTerima kasih sudah membantu memperbaiki sistem.",
+            reply_markup=main_menu_keyboard()
+        )
+
+        context.user_data["state"] = STATE_NONE
+        return
+
+    # ---------- STATE: HUBUNGI ADMIN ----------
+    if state == STATE_HUBUNGI_ADMIN:
+        pesan = text
+
+        # log ke DB
+        msg_log = MessageLog(
+            sender_id=str(member.telegram_id),
+            receiver_id=str(ADMIN_CHAT_ID),
+            message=pesan,
+            direction="user_to_admin",
+            created_at=datetime.datetime.utcnow()
+        )
+        session.add(msg_log)
+        session.commit()
+
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                "📩 *Pesan Baru dari User*\n"
+                f"User: {member.username} (ID: {member.telegram_id})\n\n"
+                f"Pesan:\n{pesan}\n\n"
+                f"Balas dengan format:\n"
+                f"/balas {member.telegram_id} <pesan>"
+            ),
+            parse_mode="Markdown"
+        )
+
+        await update.message.reply_text(
+            "📨 Pesan kamu sudah dikirim ke admin.\nAdmin akan membalas secepatnya.",
+            reply_markup=main_menu_keyboard()
+        )
+
+        context.user_data["state"] = STATE_NONE
+        return
 
     # ---------- STATE: MINTA NOMOR TUJUAN ----------
     if state == STATE_MINTA_NOMOR:
@@ -208,8 +293,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ================== MENU UTAMA ==================
 
+    # ---------- 🐞LAPOR MASALAH ----------
+    if text == "Lapor Masalah":
+        context.user_data["state"] = STATE_LAPOR_BUG
+        await update.message.reply_text(
+            "📝 Silakan jelaskan bug, error, atau saran yang kamu temui.\n"
+            "Tulis sedetail mungkin."
+        )
+        return
+
+    # ---------- 📞HUBUNGI ADMIN ----------
+    if text == "Hubungi Admin":
+        context.user_data["state"] = STATE_HUBUNGI_ADMIN
+        await update.message.reply_text(
+            "📨 Silakan tulis pesan yang ingin kamu sampaikan ke admin."
+        )
+        return
+
     # ---------- XL DOR ----------
-    if text == "XL Dor":
+    if text == "💉XL Dor":
         if not member.verified:
             await update.message.reply_text("❌ Kamu harus login dulu sebelum membeli produk.")
             return
@@ -225,11 +327,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "Login":
         if member.verified:
             await update.message.reply_text(
-                "📊 Dashboard Member:\n"
-                f"- Username: {member.username}\n"
-                f"- Saldo: Rp{int(member.saldo)}\n"
-                f"- Transaksi: {member.transaksi}\n"
-                f"- Minimal Top-Up: Rp{MIN_TOPUP}",
+                f"📊 Dashboard Member:\n"
+                f"🧑‍💻 Username: {member.username}\n"
+                f"💳 Saldo: Rp{int(member.saldo)}\n"
+                f"🤝 Transaksi: {member.transaksi}\n"
+                f"💸 Minimal Top-Up: Rp{MIN_TOPUP}",
                 reply_markup=main_menu_keyboard()
             )
             return
@@ -329,7 +431,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     trx_code = f"TOPUP-{member.id}-{int(datetime.datetime.utcnow().timestamp())}"
-
     bukti_path = generate_bukti_topup_image(trx_code, member.username, member.telegram_id)
 
     topup = Topup(
@@ -341,221 +442,3 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.commit()
 
     if os.path.exists(bukti_path):
-        with open(bukti_path, "rb") as f:
-            await context.bot.send_photo(
-                chat_id=ADMIN_CHAT_ID,
-                photo=f,
-                caption=(
-                    "📥 *Bukti Transaksi Top-Up Baru*\n"
-                    f"ID: `{trx_code}`\n"
-                    f"User: {member.username} (ID: {member.telegram_id})\n\n"
-                    "Gunakan:\n"
-                    f"/approve_topup {trx_code} <jumlah>\n"
-                    f"/reject_topup {trx_code}"
-                ),
-                parse_mode="Markdown"
-            )
-
-    await update.message.reply_text(
-        "📨 Bukti transfer sudah dikirim ke admin.\nMohon tunggu verifikasi.",
-        parse_mode="Markdown"
-    )
-
-    context.user_data["topup_mode"] = False
-
-# ================== ADMIN: VERIFIKASI TOPUP ===================
-
-async def approve_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    session = SessionLocal()
-    args = update.message.text.split()
-
-    if len(args) != 3:
-        await update.message.reply_text("Format: /approve_topup <TRX_CODE> <jumlah>")
-        return
-
-    _, trx_code, amount_str = args
-    try:
-        amount = float(amount_str)
-    except ValueError:
-        await update.message.reply_text("Jumlah tidak valid.")
-        return
-
-    topup = session.query(Topup).filter_by(trx_code=trx_code).first()
-    if not topup:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        return
-
-    if topup.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        return
-
-    member = session.query(Member).filter_by(id=topup.member_id).first()
-    if not member:
-        await update.message.reply_text("Member tidak ditemukan.")
-        return
-
-    member.saldo += amount
-    member.transaksi += 1
-    topup.amount = amount
-    topup.status = "success"
-    topup.verified_at = datetime.datetime.utcnow()
-    session.commit()
-
-    await update.message.reply_text(
-        f"✅ Top-up {trx_code} sebesar Rp{int(amount)} berhasil diverifikasi."
-    )
-
-    await context.bot.send_message(
-        chat_id=int(member.telegram_id),
-        text=f"🎉 Top-up Rp{int(amount)} berhasil! Saldo kamu sekarang Rp{int(member.saldo)}"
-    )
-
-async def reject_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    session = SessionLocal()
-    args = update.message.text.split()
-
-    if len(args) != 2:
-        await update.message.reply_text("Format: /reject_topup <TRX_CODE>")
-        return
-
-    _, trx_code = args
-
-    topup = session.query(Topup).filter_by(trx_code=trx_code).first()
-    if not topup:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        return
-
-    if topup.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        return
-
-    topup.status = "rejected"
-    topup.verified_at = datetime.datetime.utcnow()
-    session.commit()
-
-    member = session.query(Member).filter_by(id=topup.member_id).first()
-    if member:
-        await context.bot.send_message(
-            chat_id=int(member.telegram_id),
-            text=f"❌ Top-up {trx_code} ditolak admin. Saldo kamu tidak berubah."
-        )
-
-    await update.message.reply_text(f"❌ Top-up {trx_code} ditolak.")
-
-# ================== ADMIN: VERIFIKASI PEMBELIAN ===================
-
-async def approve_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    session = SessionLocal()
-    args = update.message.text.split()
-
-    if len(args) != 2:
-        await update.message.reply_text("Format: /approve_beli <TRX_CODE>")
-        return
-
-    _, trx_code = args
-
-    pembelian = session.query(Purchase).filter_by(trx_code=trx_code).first()
-    if not pembelian:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        return
-
-    if pembelian.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        return
-
-    member = session.query(Member).filter_by(id=pembelian.member_id).first()
-    if not member:
-        await update.message.reply_text("Member tidak ditemukan.")
-        return
-
-    if member.saldo < pembelian.price:
-        pembelian.status = "rejected"
-        pembelian.verified_at = datetime.datetime.utcnow()
-        session.commit()
-        await update.message.reply_text("Saldo user tidak cukup saat verifikasi. Transaksi dibatalkan.")
-        await context.bot.send_message(
-            chat_id=int(member.telegram_id),
-            text=f"❌ Pembelian {pembelian.product_name} dibatalkan karena saldo tidak cukup saat verifikasi."
-        )
-        return
-
-    member.saldo -= pembelian.price
-    member.transaksi += 1
-    pembelian.status = "success"
-    pembelian.verified_at = datetime.datetime.utcnow()
-    session.commit()
-
-    await update.message.reply_text(
-        f"✅ Pembelian {trx_code} disetujui. Saldo user sudah dipotong Rp{int(pembelian.price)}."
-    )
-
-    await context.bot.send_message(
-        chat_id=int(member.telegram_id),
-        text=(
-            f"🎉 Pembelian {pembelian.product_name} berhasil!\n"
-            f"Saldo terpotong Rp{int(pembelian.price)}.\n"
-            f"Saldo sekarang: Rp{int(member.saldo)}"
-        )
-    )
-
-async def reject_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    session = SessionLocal()
-    args = update.message.text.split()
-
-    if len(args) != 2:
-        await update.message.reply_text("Format: /reject_beli <TRX_CODE>")
-        return
-
-    _, trx_code = args
-
-    pembelian = session.query(Purchase).filter_by(trx_code=trx_code).first()
-    if not pembelian:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        return
-
-    if pembelian.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        return
-
-    pembelian.status = "rejected"
-    pembelian.verified_at = datetime.datetime.utcnow()
-    session.commit()
-
-    member = session.query(Member).filter_by(id=pembelian.member_id).first()
-    if member:
-        await context.bot.send_message(
-            chat_id=int(member.telegram_id),
-            text=f"❌ Pembelian {pembelian.product_name} dengan ID {trx_code} ditolak admin. Saldo kamu tidak berubah."
-        )
-
-    await update.message.reply_text(f"❌ Pembelian {trx_code} ditolak.")
-
-# ================== MAIN ===================
-
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("approve_topup", approve_topup))
-    app.add_handler(CommandHandler("reject_topup", reject_topup))
-    app.add_handler(CommandHandler("approve_beli", approve_beli))
-    app.add_handler(CommandHandler("reject_beli", reject_beli))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
