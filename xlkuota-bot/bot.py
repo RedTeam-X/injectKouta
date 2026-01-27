@@ -82,7 +82,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if state == "pilih_kategori":
         if text in PRODUCTS:
 
-            # NOTE KHUSUS XTRA DIGITAL
             if text == "XL XTRA DIGITAL":
                 await update.message.reply_text(
                     "⚠️ *Catatan Penting Xtra Digital*\n\n"
@@ -128,14 +127,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for nama, harga in PRODUCTS[kategori]:
                 if nama == text:
 
-                    # CEK SALDO
                     if member.saldo < harga:
                         await update.message.reply_text(
                             f"❌ Saldo tidak cukup.\nSaldo kamu: Rp{int(member.saldo)}\nHarga: Rp{harga}"
                         )
                         return
 
-                    # BUAT TRANSAKSI PEMBELIAN (pending)
                     trx_code = f"BUY-{member.id}-{int(datetime.datetime.utcnow().timestamp())}"
 
                     pembelian = Purchase(
@@ -148,7 +145,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session.add(pembelian)
                     session.commit()
 
-                    # KIRIM KE ADMIN
                     await context.bot.send_message(
                         chat_id=ADMIN_CHAT_ID,
                         text=(
@@ -201,7 +197,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         member.otp_created_at = datetime.datetime.utcnow()
         session.commit()
 
-        # OTP DIKIRIM KE DM USER (PRIBADI)
         await context.bot.send_message(
             chat_id=tg_user.id,
             text=f"🔐 Kode OTP kamu: {otp}\nKirim kode ini dalam waktu 1 menit."
@@ -242,10 +237,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ---------- OTP VALIDASI ----------
     if text.isdigit() and member.otp == text and not member.verified:
-
         now = datetime.datetime.utcnow()
         if member.otp_created_at and (now - member.otp_created_at).total_seconds() <= 60:
-
             member.verified = True
             member.otp = None
             member.otp_created_at = None
@@ -270,7 +263,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # OTP SALAH
     if text.isdigit() and not member.verified:
         await update.message.reply_text(
             "❌ OTP salah atau kadaluarsa. Klik *Login* untuk minta ulang.",
@@ -510,6 +502,7 @@ async def reject_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(f"❌ Pembelian {trx_code} ditolak.")
+
 # ================== MAIN ===================
 
 def main():
