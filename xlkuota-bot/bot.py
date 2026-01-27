@@ -55,7 +55,7 @@ PRODUCTS = {
     ]
 }
 
-================== HELPER DB & UTIL ==================
+#================== HELPER DB & UTIL ==================#
 
 def getorcreatemember(session, tguser):
     member = session.query(Member).filterby(telegramid=str(tg_user.id)).first()
@@ -101,7 +101,7 @@ def autotagreport(text: str) -> str:
         return "ERROR"
     return "BUG"  # default aman
 
-================== START ==================
+#================== START ==================#
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.userdata["state"] = STATENONE
@@ -111,7 +111,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         replymarkup=mainmenu_keyboard()
     )
 
-================== HANDLE TEKS ==================
+#================== HANDLE TEKS ==================#
 
 async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
     session = SessionLocal()
@@ -120,7 +120,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
     member = getorcreatemember(session, tguser)
     state = context.userdata.get("state", STATENONE)
 
-    # ---------- STATE: LAPOR BUG / MASALAH ----------
+    # ---------- STATE: LAPOR BUG / MASALAH ----------#
     if state == STATELAPORBUG:
         laporan = text
         kategori = autotagreport(laporan)
@@ -155,7 +155,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         context.userdata["state"] = STATENONE
         return
 
-    # ---------- STATE: HUBUNGI ADMIN ----------
+    # ---------- STATE: HUBUNGI ADMIN ----------#
     if state == STATEHUBUNGIADMIN:
         pesan = text
 
@@ -190,7 +190,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         context.userdata["state"] = STATENONE
         return
 
-    # ---------- STATE: MINTA NOMOR TUJUAN ----------
+    # ---------- STATE: MINTA NOMOR TUJUAN ----------#
     if state == STATEMINTANOMOR:
         nomor = text
         if not isvalidphone(nomor):
@@ -249,7 +249,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         context.userdata["itemdipilih"] = None
         return
 
-    # ---------- STATE: PILIH KATEGORI ----------
+    # ---------- STATE: PILIH KATEGORI ----------#
     if state == STATEPILIHKATEGORI:
         if text in PRODUCTS:
             items = PRODUCTS[text]
@@ -270,7 +270,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         await update.message.reply_text("❌ Kategori tidak dikenal. Pilih dari daftar.")
         return
 
-    # ---------- STATE: PILIH ITEM ----------
+    # ---------- STATE: PILIH ITEM ----------#
     if state == STATEPILIHITEM:
         kategori = context.user_data.get("kategori")
         if text == "⬅️ Kembali":
@@ -291,9 +291,9 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         await update.message.reply_text("❌ Item tidak ditemukan. Pilih dari daftar.")
         return
 
-    # ================== MENU UTAMA ==================
+    #================== MENU UTAMA ==================#
 
-    # ---------- LAPOR MASALAH ----------
+    #---------- LAPOR MASALAH ----------#
     if text == "Lapor Masalah":
         context.userdata["state"] = STATELAPOR_BUG
         await update.message.reply_text(
@@ -302,7 +302,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         )
         return
 
-    # ---------- HUBUNGI ADMIN ----------
+    # ---------- HUBUNGI ADMIN ---------- #
     if text == "Hubungi Admin":
         context.userdata["state"] = STATEHUBUNGI_ADMIN
         await update.message.reply_text(
@@ -310,7 +310,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         )
         return
 
-    # ---------- XL DOR ----------
+    # ---------- XL DOR ---------- #
     if text == "XL Dor":
         if not member.verified:
             await update.message.reply_text("❌ Kamu harus login dulu sebelum membeli produk.")
@@ -323,7 +323,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         await update.message.replytext("📦 Pilih kategori produk XL:", replymarkup=reply)
         return
 
-    # ---------- LOGIN ----------
+    # ---------- LOGIN ---------- #
     if text == "Login":
         if member.verified:
             await update.message.reply_text(
@@ -349,12 +349,12 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         await update.message.reply_text("📩 OTP sudah dikirim ke DM kamu.")
         return
 
-    # ---------- PPOB ----------
+    # ---------- PPOB ----------#
     if text == "PPOB":
         await update.message.replytext("⚠️ Menu PPOB masih Coming Soon.", parsemode="Markdown")
         return
 
-    # ---------- TOP UP ----------
+    # ---------- TOP UP ----------#
     if text == "Top Up":
         if not member.verified:
             await update.message.reply_text("❌ Kamu harus login dulu.")
@@ -379,7 +379,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         context.userdata["topupmode"] = True
         return
 
-    # ---------- OTP VALIDASI ----------
+    # ---------- OTP VALIDASI ----------#
     if text.isdigit() and member.otp == text and not member.verified:
         now = datetime.datetime.utcnow()
         if member.otpcreatedat and (now - member.otpcreatedat).total_seconds() <= 60:
@@ -419,7 +419,7 @@ async def handletext(update: Update, context: ContextTypes.DEFAULTTYPE):
         replymarkup=mainmenu_keyboard()
     )
 
-================== HANDLE FOTO (BUKTI TOPUP) ===================
+#================== HANDLE FOTO (BUKTI TOPUP) ===================#
 
 async def handlephoto(update: Update, context: ContextTypes.DEFAULTTYPE):
     session = SessionLocal()
@@ -464,7 +464,7 @@ async def handlephoto(update: Update, context: ContextTypes.DEFAULTTYPE):
 
     context.userdata["topupmode"] = False
 
-================== ADMIN: VERIFIKASI TOPUP ===================
+#================== ADMIN: VERIFIKASI TOPUP ===================#
 
 async def approvetopup(update: Update, context: ContextTypes.DEFAULTTYPE):
     if update.effectiveuser.id != ADMINCHAT_ID:
@@ -549,7 +549,7 @@ async def rejecttopup(update: Update, context: ContextTypes.DEFAULTTYPE):
 
     await update.message.replytext(f"❌ Top-up {trxcode} ditolak.")
 
-================== ADMIN: VERIFIKASI PEMBELIAN ===================
+#================== ADMIN: VERIFIKASI PEMBELIAN ===================#
 
 async def approvebeli(update: Update, context: ContextTypes.DEFAULTTYPE):
     if update.effectiveuser.id != ADMINCHAT_ID:
@@ -643,7 +643,7 @@ async def rejectbeli(update: Update, context: ContextTypes.DEFAULTTYPE):
 
     await update.message.replytext(f"❌ Pembelian {trxcode} ditolak.")
 
-================== ADMIN: BALAS USER ===================
+#================== ADMIN: BALAS USER ===================#
 
 async def balas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effectiveuser.id != ADMINCHAT_ID:
@@ -676,7 +676,7 @@ async def balas(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("Pesan terkirim ke user.")
 
-================== MAIN ===================
+#================== MAIN ===================#
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
