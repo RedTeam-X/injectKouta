@@ -81,6 +81,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---------- STATE: PILIH KATEGORI ----------
     if state == "pilih_kategori":
         if text in PRODUCTS:
+
+            # NOTE KHUSUS XTRA DIGITAL
             if text == "XL XTRA DIGITAL":
                 await update.message.reply_text(
                     "⚠️ *Catatan Penting Xtra Digital*\n\n"
@@ -125,12 +127,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if kategori in PRODUCTS:
             for nama, harga in PRODUCTS[kategori]:
                 if nama == text:
+
+                    # CEK SALDO
                     if member.saldo < harga:
                         await update.message.reply_text(
                             f"❌ Saldo tidak cukup.\nSaldo kamu: Rp{int(member.saldo)}\nHarga: Rp{harga}"
                         )
                         return
 
+                    # BUAT TRANSAKSI PEMBELIAN (pending)
                     trx_code = f"BUY-{member.id}-{int(datetime.datetime.utcnow().timestamp())}"
 
                     pembelian = Purchase(
@@ -143,12 +148,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session.add(pembelian)
                     session.commit()
 
-                    await update.message.reply_text(
-                        "📨 Permintaan pembelian dikirim ke admin.\n"
-                        "Admin akan mengirimkan kuota secara manual dan memverifikasi transaksi.",
-                        reply_markup=main_menu_keyboard()
-                    )
-
+                    # KIRIM KE ADMIN
                     await context.bot.send_message(
                         chat_id=ADMIN_CHAT_ID,
                         text=(
@@ -163,6 +163,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             f"/reject_beli {trx_code}"
                         ),
                         parse_mode="Markdown"
+                    )
+
+                    await update.message.reply_text(
+                        "📨 Permintaan pembelian dikirim ke admin.\n"
+                        "Admin akan mengirimkan kuota secara manual dan memverifikasi transaksi.",
+                        reply_markup=main_menu_keyboard()
                     )
 
                     context.user_data["state"] = None
@@ -192,12 +198,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         otp = str(random.randint(100000, 999999))
         member.otp = otp
+        member.otp_created_at = datetime.datetime.utcnow()
         session.commit()
 
+        # OTP DIKIRIM KE DM USER (PRIBADI)
         await context.bot.send_message(
             chat_id=tg_user.id,
-            text=f"🔐 Kode OTP kamu: {otp}\nKirim kode ini di chat bot."
+            text=f"🔐 Kode OTP kamu: {otp}\nKirim kode ini dalam waktu 1 menit."
         )
+
         await update.message.reply_text("📩 OTP sudah dikirim ke akun Telegram kamu.")
         return
 
@@ -233,21 +242,35 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ---------- OTP VALIDASI ----------
     if text.isdigit() and member.otp == text and not member.verified:
-        member.verified = True
-        member.otp = None
-        session.commit()
 
-        await update.message.reply_text(
-            "✅ Login berhasil!\n\n"
-            f"📊 Dashboard Member:\n"
-            f"- Nama Akun: {member.username}\n"
-            f"- Saldo: Rp{int(member.saldo)}\n"
-            f"- Jumlah Transaksi: {member.transaksi}\n"
-            f"- Minimal Top-Up: Rp{MIN_TOPUP}",
-            reply_markup=main_menu_keyboard()
-        )
+        now = datetime.datetime.utcnow()
+        if member.otp_created_at and (now - member.otp_created_at).total_seconds() <= 60:
+
+            member.verified = True
+            member.otp = None
+            member.otp_created_at = None
+            session.commit()
+
+            await update.message.reply_text(
+                "✅ Login berhasil!\n\n"
+                f"📊 Dashboard Member:\n"
+                f"- Nama Akun: {member.username}\n"
+                f"- Saldo: Rp{int(member.saldo)}\n"
+                f"- Jumlah Transaksi: {member.transaksi}\n"
+                f"- Minimal Top-Up: Rp{MIN_TOPUP}",
+                reply_markup=main_menu_keyboard()
+            )
+        else:
+            member.otp = None
+            member.otp_created_at = None
+            session.commit()
+            await update.message.reply_text(
+                "⏰ OTP sudah kadaluarsa. Klik *Login* untuk minta ulang.",
+                parse_mode="Markdown"
+            )
         return
 
+    # OTP SALAH
     if text.isdigit() and not member.verified:
         await update.message.reply_text(
             "❌ OTP salah atau kadaluarsa. Klik *Login* untuk minta ulang.",
@@ -487,7 +510,6 @@ async def reject_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(f"❌ Pembelian {trx_code} ditolak.")
-
 # ================== MAIN ===================
 
 def main():
