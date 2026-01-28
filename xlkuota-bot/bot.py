@@ -545,7 +545,7 @@ async def approvetopup(update: Update, context: ContextTypes.DEFAULTTYPE):
         await update.message.replytext("Format: /approvetopup <TRX_CODE> <jumlah>")
         return
 
-    , trxcode, amount_str = args
+, trx_code, amount_str = args
 
     try:
         amount = float(amount_str)
