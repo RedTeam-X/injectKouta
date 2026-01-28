@@ -539,19 +539,19 @@ async def approvetopup(update: Update, context: ContextTypes.DEFAULTTYPE):
         return
 
     session = SessionLocal()
-    args = update.message.text.split()
+args = update.message.text.split()
 
-    if len(args) != 3:
-        await update.message.replytext("Format: /approvetopup <TRX_CODE> <jumlah>")
-        return
+if len(args) != 3:
+    await update.message.reply_text("Format: /approve_topup <TRX_CODE> <jumlah>")
+    return
 
 _, trx_code, amount_str = args
 
-    try:
-        amount = float(amount_str)
-    except ValueError:
-        await update.message.reply_text("Jumlah tidak valid.")
-        return
+try:
+    amount = float(amount_str)
+except ValueError:
+    await update.message.reply_text("Jumlah tidak valid.")
+    return
 
     topup = session.query(Topup).filterby(trxcode=trx_code).first()
     if not topup:
