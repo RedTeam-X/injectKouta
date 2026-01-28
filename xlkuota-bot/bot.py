@@ -588,22 +588,35 @@ async def rejecttopup(update: Update, context: ContextTypes.DEFAULTTYPE):
         return
 
     session = SessionLocal()
-    args = update.message.text.split()
+args = update.message.text.split()
 
-    if len(args) != 2:
-        await update.message.replytext("Format: /rejecttopup <TRX_CODE>")
-        return
+if len(args) != 2:
+    await update.message.reply_text("Format: /reject_topup <TRX_CODE>")
+    return
 
-    , trxcode = args
+_, trx_code = args
 
-    topup = session.query(Topup).filterby(trxcode=trx_code).first()
-    if not topup:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        return
+topup = session.query(Topup).filter_by(trx_code=trx_code).first()
+if not topup:
+    await update.message.reply_text("ID transaksi tidak ditemukan.")
+    return
 
-    if topup.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        return
+if topup.status != "pending":
+    await update.message.reply_text("Transaksi sudah diproses.")
+    return
+
+topup.status = "rejected"
+topup.verified_at = datetime.datetime.utcnow()
+session.commit()
+
+member = session.query(Member).filter_by(id=topup.member_id).first()
+if member:
+    await context.bot.send_message(
+        chat_id=int(member.telegram_id),
+        text=f"❌ Top-up {trx_code} ditolak admin. Saldo kamu tidak berubah."
+    )
+
+await update.message.reply_text(f"❌ Top-up {trx_code} ditolak.")
 
     topup.status = "rejected"
     topup.verified_at = datetime.datetime.utcnow()
