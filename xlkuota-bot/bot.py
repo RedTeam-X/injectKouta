@@ -1148,8 +1148,8 @@ def main():
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
     application.add_handler(CommandHandler("xldor", menu_xldor))
-application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
-application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
+    application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
+    application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
 
     # ================== HANDLER MESSAGE ==================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
