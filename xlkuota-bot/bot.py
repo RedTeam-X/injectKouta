@@ -6,6 +6,7 @@ import datetime
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
+    CallbackQueryHandler,   # <--- WAJIB TAMBAH INI
     ContextTypes, filters
 )
 from PIL import Image, ImageDraw, ImageFont
