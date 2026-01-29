@@ -889,7 +889,6 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode = args[0].lower()
     session = SessionLocal()
 
-    # Update saldo user
     if mode == "saldo":
         if len(args) < 3:
             await update.message.reply_text("Format: /update saldo <id_user> <jumlah>")
@@ -908,7 +907,6 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❌ User tidak ditemukan.")
 
-    # Update item PPOB
     elif mode == "ppob":
         if len(args) < 6:
             await update.message.reply_text("Format: /update ppob <nama_item> <harga> <deskripsi> <masa_aktif> <status>")
@@ -925,7 +923,6 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(f"❌ Item PPOB '{nama_item}' tidak ditemukan.")
 
-    # Update item XL Dor
     elif mode == "xldor":
         if len(args) < 6:
             await update.message.reply_text("Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>")
@@ -945,7 +942,37 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Mode update tidak dikenal.")
 
-    await update.message.reply_text("Pesan terkirim ke user.")
+# ================== ADMIN: BULK UPDATE XL DOR ==================
+async def bulk_update_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        return
+
+    session = SessionLocal()
+    text = update.message.text.split("\n")[1:]  # skip command line
+    current_item = None
+
+    for line in text:
+        line = line.strip()
+        if not line:
+            continue
+
+        if line.lower().startswith("harga:"):
+            harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
+            if current_item:
+                item = session.query(XLDorItem).filter_by(nama_item=current_item).first()
+                if item:
+                    item.harga = harga
+                    session.commit()
+                    await update.message.reply_text(f"✅ {current_item} diupdate ke Rp.{harga}")
+                else:
+                    new_item = XLDorItem(nama_item=current_item, harga=harga, aktif=True)
+                    session.add(new_item)
+                    session.commit()
+                    await update.message.reply_text(f"✅ {current_item} ditambahkan dengan harga Rp.{harga}")
+                current_item = None
+        else:
+            current_item = line
+            
     # ================== ADMIN: BROADCAST ==================
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -987,6 +1014,9 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # ===== COMMAND HANDLERS =====
+    application.add_handler(CommandHandler("balas", balas))
+    application.add_handler(CommandHandler("update", update_data))
+    application.add_handler(CommandHandler("bulk_update_xldor", bulk_update_xldor)).  
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("approve_topup", approve_topup))
     app.add_handler(CommandHandler("reject_topup", reject_topup))
