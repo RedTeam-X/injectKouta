@@ -34,31 +34,24 @@ def main_menu_keyboard():
         resize_keyboard=True
     )
 
-# ================== DATA PRODUK ==================
+# ================== MENU XL DOR ==================
+async def menu_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    session = SessionLocal()
+    items = session.query(XLDorItem).filter_by(aktif=True).all()
 
-PRODUCTS = {
-    "XL XTRA DIGITAL": [
-        ("XL XTRA KOUTA CONF 2GB, 1HR", 5000),
-        ("XL XTRA KOUTA YT 2GB, 3HR", 7000),
-        ("XL XTRA KOUTA YT 3GB, 7HR", 10000),
-        ("XL XTRA KOUTA INSTAGRAM 3GB, 7HR", 10000),
-        ("XL XTRA KOUTA INSTAGRAM 2GB, 30HR", 11000),
-        ("XL XTRA KOUTA FACEBOOK 2GB, 30HR", 11000),
-        ("XL XTRA KOUTA MIDNIGHT 5GB, 30HR", 12000),
-        ("XL XTRA KOUTA FILM 5GB, 30HR", 12000),
-        ("XL XTRA KOUTA 30GB, 30HR", 12000)
-    ],
-    "XL FLEX MAXX": [
-        ("XL DATA FLEX MAX 33GB, 14HR", 49000),
-        ("XL DATA FLEX MAX 75GB, 14HR", 72000),
-        ("XL DATA FLEX MAX 50GB, 28HR", 86000)
-    ],
-    "XL AKRAB": [
-        ("XTRA COMBO VIP 5GB+10GB YT+20mnt", 66000),
-        ("XTRA COMBO VIP 10GB+20GB YT+30mnt", 94000),
-        ("XTRA COMBO VIP 15GB+30GB YT+40mnt", 131000)
-    ]
-}
+    if not items:
+        await update.message.reply_text("❌ Belum ada item XL Dor.")
+        return
+
+    text = "📦 Daftar Paket XL Dor:\n\n"
+    for item in items:
+        text += (
+            f"{item.deskripsi}\n"
+            f"Harga: Rp {int(item.harga)}\n"
+            f"Masa Aktif: {item.masa_aktif} Hari\n\n"
+        )
+
+    await update.message.reply_text(text)
 
 # ================== UTIL & HELPER ==================
 
@@ -119,11 +112,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================== HANDLE TEXT ==================
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    session = SessionLocal()
-    text = (update.message.text or "").strip()
-    tg_user = update.effective_user
-    member = get_or_create_member(session, tg_user)
-    state = context.user_data.get("state", STATE_NONE)
+    text = update.message.text
+
+    if text == "XL Dor":
+        await menu_xldor(update, context)
+    # tambahkan menu lain sesuai kebutuhan...
 
     # ---------- STATE: LAPOR BUG ----------
     if state == STATE_LAPOR_BUG:
@@ -1053,11 +1046,12 @@ def main():
     application.add_handler(CommandHandler("reject_topup", reject_topup))
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
-
+    application.addhandler(CommandHandler("xldor", menuxldor))  # tambahan
+    
     # ================== HANDLER MESSAGE ==================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-
+    
     # ================== JALANKAN BOT ==================
     application.run_polling()
 
