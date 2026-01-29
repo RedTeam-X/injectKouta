@@ -1046,12 +1046,12 @@ def main():
     application.add_handler(CommandHandler("reject_topup", reject_topup))
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
-    application.addhandler(CommandHandler("xldor", menuxldor))  # tambahan
-    
+    application.add_handler(CommandHandler("xldor", menu_xldor))  # perbaikan
+
     # ================== HANDLER MESSAGE ==================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    
+
     # ================== JALANKAN BOT ==================
     application.run_polling()
 
