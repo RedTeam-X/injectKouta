@@ -808,23 +808,55 @@ async def reject_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(f"❌ Pembelian {trx_code} ditolak.")
-    # ================== ADMIN: BALAS USER ==================
-
+  # ================== ADMIN: BALAS USER ==================
 async def balas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
         return
 
     session = SessionLocal()
+    args = update.message.text.split(" ", 3)
 
-    # Format: /balas <telegram_id> <pesan>
-    args = update.message.text.split(" ", 2)
     if len(args) < 3:
-        await update.message.reply_text("Format: /balas <telegram_id> <pesan>")
+        await update.message.reply_text(
+            "Format: /balas <telegram_id> <pesan> atau /balas <telegram_id> <kirim_gambar> <pesan>"
+        )
         return
 
-    _, user_id, pesan = args
+    _, user_id, mode_or_pesan, *rest = args
 
-    # Simpan log pesan
+    # Mode kirim gambar
+    if mode_or_pesan.lower() == "kirim_gambar":
+        if len(rest) < 1:
+            await update.message.reply_text("Format: /balas <telegram_id> <kirim_gambar> <pesan>")
+            return
+
+        pesan = rest[0]
+
+        # Simpan log pesan
+        msg_log = MessageLog(
+            sender_id=str(ADMIN_CHAT_ID),
+            receiver_id=str(user_id),
+            message=f"[GAMBAR] {pesan}",
+            direction="admin_to_user",
+            created_at=datetime.datetime.utcnow()
+        )
+        session.add(msg_log)
+        session.commit()
+
+        # Kirim gambar + pesan
+        await context.bot.send_photo(
+            chat_id=int(user_id),
+            photo=open("qris.png", "rb"),  # contoh gambar statis
+            caption=f"📬 Balasan dari Admin:\n{pesan}",
+            parse_mode="Markdown"
+        )
+
+        await update.message.reply_text(f"✅ Gambar + pesan terkirim ke user {user_id}.")
+        return
+
+    # Mode pesan teks biasa
+    pesan = mode_or_pesan if not rest else mode_or_pesan + " " + " ".join(rest)
+
     msg_log = MessageLog(
         sender_id=str(ADMIN_CHAT_ID),
         receiver_id=str(user_id),
@@ -835,12 +867,83 @@ async def balas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.add(msg_log)
     session.commit()
 
-    # Kirim ke user
     await context.bot.send_message(
         chat_id=int(user_id),
-        text=f"📬 *Balasan dari Admin:*\n{pesan}",
+        text=f"📬 Balasan dari Admin:\n{pesan}",
         parse_mode="Markdown"
     )
+
+    await update.message.reply_text("✅ Pesan teks terkirim ke user.")
+
+
+# ================== ADMIN: UPDATE DATA ==================
+async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        return
+
+    args = context.args
+    if len(args) < 1:
+        await update.message.reply_text("Format: /update <saldo|ppob|xldor> ...")
+        return
+
+    mode = args[0].lower()
+    session = SessionLocal()
+
+    # Update saldo user
+    if mode == "saldo":
+        if len(args) < 3:
+            await update.message.reply_text("Format: /update saldo <id_user> <jumlah>")
+            return
+        user_id, jumlah = args[1], int(args[2])
+        member = session.query(Member).filter_by(telegram_id=str(user_id)).first()
+        if member:
+            saldo_awal = member.saldo
+            member.saldo += jumlah
+            session.commit()
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=f"🎉 Saldo kamu bertambah Rp{jumlah}!\nSaldo awal: Rp{saldo_awal}\nSaldo sekarang: Rp{member.saldo}"
+            )
+            await update.message.reply_text(f"✅ Saldo user {user_id} berhasil diupdate.")
+        else:
+            await update.message.reply_text("❌ User tidak ditemukan.")
+
+    # Update item PPOB
+    elif mode == "ppob":
+        if len(args) < 6:
+            await update.message.reply_text("Format: /update ppob <nama_item> <harga> <deskripsi> <masa_aktif> <status>")
+            return
+        _, nama_item, harga, deskripsi, masa_aktif, status = args
+        item = session.query(PPOBItem).filter_by(nama_item=nama_item).first()
+        if item:
+            item.harga = int(harga)
+            item.deskripsi = deskripsi
+            item.masa_aktif = int(masa_aktif)
+            item.aktif = True if status.lower() == "aktif" else False
+            session.commit()
+            await update.message.reply_text(f"✅ Item PPOB '{nama_item}' berhasil diupdate.")
+        else:
+            await update.message.reply_text(f"❌ Item PPOB '{nama_item}' tidak ditemukan.")
+
+    # Update item XL Dor
+    elif mode == "xldor":
+        if len(args) < 6:
+            await update.message.reply_text("Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>")
+            return
+        _, nama_item, harga, deskripsi, masa_aktif, status = args
+        item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+        if item:
+            item.harga = int(harga)
+            item.deskripsi = deskripsi
+            item.masa_aktif = int(masa_aktif)
+            item.aktif = True if status.lower() == "aktif" else False
+            session.commit()
+            await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil diupdate.")
+        else:
+            await update.message.reply_text(f"❌ Item XL Dor '{nama_item}' tidak ditemukan.")
+
+    else:
+        await update.message.reply_text("❌ Mode update tidak dikenal.")
 
     await update.message.reply_text("Pesan terkirim ke user.")
     # ================== ADMIN: BROADCAST ==================
