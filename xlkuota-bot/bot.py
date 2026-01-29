@@ -930,27 +930,25 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Update item XL Dor
     elif mode == "xldor":
-        if len(args) < 6:
-            await update.message.reply_text(
-                "Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>"
-            )
-            return
+    if len(args) < 6:
+        await update.message.reply_text(
+            "Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>"
+        )
+        return
 
-        _, nama_item, harga, deskripsi, masa_aktif, status = args
-        item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+    _, nama_item, harga, *desc_parts, masa_aktif, status = args
+    deskripsi = " ".join(desc_parts)
 
-        if item:
-            item.harga = int(harga)
-            item.deskripsi = deskripsi
-            item.masa_aktif = int(masa_aktif)
-            item.aktif = True if status.lower() == "aktif" else False
-            session.commit()
-            await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil diupdate.")
-        else:
-            await update.message.reply_text(f"❌ Item XL Dor '{nama_item}' tidak ditemukan.")
-
+    item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+    if item:
+        item.harga = int(harga)
+        item.deskripsi = deskripsi
+        item.masa_aktif = int(masa_aktif)
+        item.aktif = True if status.lower() == "aktif" else False
+        session.commit()
+        await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil diupdate.")
     else:
-        await update.message.reply_text("❌ Mode update tidak dikenal.")
+        await update.message.reply_text(f"❌ Item XL Dor '{nama_item}' tidak ditemukan.")
 # ================== ADMIN: BULK UPDATE XL DOR ==================
 async def bulk_update_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
