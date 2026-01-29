@@ -928,10 +928,18 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             item.deskripsi = deskripsi
             item.masa_aktif = int(masa_aktif)
             item.aktif = True if status.lower() == "aktif" else False
-            session.commit()
-            await update.message.reply_text(f"✅ Item PPOB '{nama_item}' berhasil diupdate.")
         else:
-            await update.message.reply_text(f"❌ Item PPOB '{nama_item}' tidak ditemukan.")
+            item = PPOBItem(
+                nama_item=nama_item,
+                harga=int(harga),
+                deskripsi=deskripsi,
+                masa_aktif=int(masa_aktif),
+                aktif=True if status.lower() == "aktif" else False
+            )
+            session.add(item)
+
+        session.commit()
+        await update.message.reply_text(f"✅ Item PPOB '{nama_item}' berhasil disimpan.")
 
     # Update item XL Dor
     elif mode == "xldor":
@@ -950,10 +958,21 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             item.deskripsi = deskripsi
             item.masa_aktif = int(masa_aktif)
             item.aktif = True if status.lower() == "aktif" else False
-            session.commit()
-            await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil diupdate.")
         else:
-            await update.message.reply_text(f"❌ Item XL Dor '{nama_item}' tidak ditemukan.")
+            item = XLDorItem(
+                nama_item=nama_item,
+                harga=int(harga),
+                deskripsi=deskripsi,
+                masa_aktif=int(masa_aktif),
+                aktif=True if status.lower() == "aktif" else False
+            )
+            session.add(item)
+
+        session.commit()
+        await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil disimpan.")
+
+    else:
+        await update.message.reply_text("❌ Mode update tidak dikenal.")
 # ================== ADMIN: BULK UPDATE XL DOR ==================
 async def bulk_update_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
@@ -1023,7 +1042,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================== MAIN ==================
 
 def main():
-    # Buat instance aplikasi bot
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # ================== HANDLER COMMAND ==================
