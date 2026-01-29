@@ -927,24 +927,28 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ Item PPOB '{nama_item}' tidak ditemukan.")
 
     elif mode == "xldor":
-        if len(args) < 6:
-            await update.message.reply_text("Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>")
-            return
-        _, nama_item, harga, deskripsi, masa_aktif, status = args
-        item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
-        if item:
-            item.harga = int(harga)
-            item.deskripsi = deskripsi
-            item.masa_aktif = int(masa_aktif)
-            item.aktif = True if status.lower() == "aktif" else False
-            session.commit()
-            await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil diupdate.")
-        else:
-            await update.message.reply_text(f"❌ Item XL Dor '{nama_item}' tidak ditemukan.")
+    if len(args) < 6:
+        await update.message.reply_text(
+            "Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>"
+        )
+        return
 
+    _, nama_item, harga, deskripsi, masa_aktif, status = args
+    item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+
+    if item:
+        item.harga = int(harga)
+        item.deskripsi = deskripsi
+        item.masa_aktif = int(masa_aktif)
+        item.aktif = True if status.lower() == "aktif" else False
+        session.commit()
+        await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil diupdate.")
     else:
-        await update.message.reply_text("❌ Mode update tidak dikenal.")
+        await update.message.reply_text(f"❌ Item XL Dor '{nama_item}' tidak ditemukan.")
 
+else:
+    await update.message.reply_text("❌ Mode update tidak dikenal.")
+    
 # ================== ADMIN: BULK UPDATE XL DOR ==================
 async def bulk_update_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
