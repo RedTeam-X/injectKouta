@@ -966,36 +966,70 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     else:
         await update.message.reply_text("❌ Mode update tidak dikenal.")
-# ================== ADMIN: BULK UPDATE XL DOR ==================
+# ================== BULK UPDATE XL DOR ==================
 async def bulk_update_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
         return
 
     session = SessionLocal()
-    text = update.message.text.split("\n")[1:]  # skip command line
-    current_item = None
+    text = update.message.text
 
-    for line in text:
-        line = line.strip()
-        if not line:
-            continue
+    # Pisahkan setiap baris, abaikan baris pertama "/bulk_update_xldor"
+    lines = text.split("\n")[1:]
 
-        if line.lower().startswith("harga:"):
-            harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
-            if current_item:
-                item = session.query(XLDorItem).filter_by(nama_item=current_item).first()
-                if item:
-                    item.harga = harga
-                    session.commit()
-                    await update.message.reply_text(f"✅ {current_item} diupdate ke Rp.{harga}")
-                else:
-                    new_item = XLDorItem(nama_item=current_item, harga=harga, aktif=True)
-                    session.add(new_item)
-                    session.commit()
-                    await update.message.reply_text(f"✅ {current_item} ditambahkan dengan harga Rp.{harga}")
-                current_item = None
-        else:
-            current_item = line
+    success = []
+    failed = []
+
+    for line in lines:
+        try:
+            parts = line.strip().split()
+            if len(parts) < 6:
+                failed.append(f"❌ Format salah: {line}")
+                continue
+
+            nama_item = parts[0]
+            harga = int(parts[1])
+
+            # Ambil deskripsi di dalam tanda kutip
+            if '"' in line:
+                deskripsi = line.split('"')[1]
+            else:
+                failed.append(f"❌ Deskripsi tidak ditemukan: {line}")
+                continue
+
+            # Ambil masa aktif dan status dari bagian akhir
+            tail = line.strip().split()[-2:]
+            masa_aktif = int(tail[0])
+            status = tail[1].lower()
+
+            item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+            if item:
+                item.harga = harga
+                item.deskripsi = deskripsi
+                item.masa_aktif = masa_aktif
+                item.aktif = True if status == "aktif" else False
+            else:
+                item = XLDorItem(
+                    nama_item=nama_item,
+                    harga=harga,
+                    deskripsi=deskripsi,
+                    masa_aktif=masa_aktif,
+                    aktif=True if status == "aktif" else False
+                )
+                session.add(item)
+
+            session.commit()
+            success.append(f"✅ {nama_item}")
+        except Exception as e:
+            failed.append(f"❌ {line} → {str(e)}")
+
+    result = "📦 Hasil Bulk Update XL Dor:\n\n"
+    if success:
+        result += "✅ Berhasil disimpan:\n" + "\n".join(success) + "\n\n"
+    if failed:
+        result += "❌ Gagal diproses:\n" + "\n".join(failed)
+
+    await update.message.reply_text(result)
             
     # ================== ADMIN: BROADCAST ==================
 
