@@ -34,24 +34,91 @@ def main_menu_keyboard():
         resize_keyboard=True
     )
 
-# ================== MENU XL DOR ==================
+# # ================== MENU XL DOR (KATEGORI) ==================
 async def menu_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    session = SessionLocal()
-    items = session.query(XLDorItem).filter_by(aktif=True).all()
+    keyboard = [
+        [
+            InlineKeyboardButton("XTRA DIGITAL", callback_data="xldorcat_XTRA"),
+            InlineKeyboardButton("FLEX MAXX", callback_data="xldorcat_FLEX")
+        ],
+        [
+            InlineKeyboardButton("AKRAB", callback_data="xldorcat_AKRAB")
+        ]
+    ]
 
-    if not items:
-        await update.message.reply_text("❌ Belum ada item XL Dor.")
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "📦 Silakan pilih kategori XL Dor:",
+        reply_markup=reply_markup
+    )
+# ================== CALLBACK KATEGORI XL DOR ==================
+async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    kategori = query.data.split("_")[1]
+
+    session = SessionLocal()
+
+    if kategori == "XTRA":
+        items = session.query(XLDorItem).filter(
+            XLDorItem.deskripsi.ilike("%Xtra%"), 
+            XLDorItem.aktif == True
+        ).all()
+
+    elif kategori == "FLEX":
+        items = session.query(XLDorItem).filter(
+            XLDorItem.deskripsi.ilike("%Flex Max%"),
+            XLDorItem.aktif == True
+        ).all()
+
+    elif kategori == "AKRAB":
+        items = session.query(XLDorItem).filter(
+            XLDorItem.deskripsi.ilike("%VIP%"),
+            XLDorItem.aktif == True
+        ).all()
+
+    else:
+        await query.edit_message_text("❌ Kategori tidak ditemukan.")
         return
 
-    text = "📦 Daftar Paket XL Dor:\n\n"
+    keyboard = []
     for item in items:
-        text += (
-            f"{item.deskripsi}\n"
-            f"Harga: Rp {int(item.harga)}\n"
-            f"Masa Aktif: {item.masa_aktif} Hari\n\n"
-        )
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"{item.deskripsi} - Rp{int(item.harga)}",
+                callback_data=f"xldoritem_{item.id}"
+            )
+        ])
 
-    await update.message.reply_text(text)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        f"📦 XL Dor: {kategori}\nPilih paket:",
+        reply_markup=reply_markup
+    )
+# ================== CALLBACK ITEM XL DOR ==================
+async def callback_xldor_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = int(query.data.split("_")[1])
+
+    session = SessionLocal()
+    item = session.query(XLDorItem).filter_by(id=item_id).first()
+
+    text = (
+        f"📦 *{item.deskripsi}*\n"
+        f"💰 Harga: Rp {int(item.harga)}\n"
+        f"⏳ Masa Aktif: {item.masa_aktif} Hari\n\n"
+        f"Masukkan nomor tujuan untuk pembelian."
+    )
+
+    await query.edit_message_text(text, parse_mode="Markdown")
+
+    context.user_data["xldor_item"] = item_id
+    context.user_data["state"] = "input_nomor_xldor"
 
 # ================== UTIL & HELPER ==================
 
@@ -1080,7 +1147,9 @@ def main():
     application.add_handler(CommandHandler("reject_topup", reject_topup))
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
-    application.add_handler(CommandHandler("xldor", menu_xldor))  # perbaikan
+    application.add_handler(CommandHandler("xldor", menu_xldor))
+application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
+application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
 
     # ================== HANDLER MESSAGE ==================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
