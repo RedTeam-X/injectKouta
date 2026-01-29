@@ -1014,26 +1014,25 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================== MAIN ==================
 
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Buat instance aplikasi bot
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # ===== COMMAND HANDLERS =====
+    # ================== HANDLER COMMAND ==================
+    application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("balas", balas))
     application.add_handler(CommandHandler("update", update_data))
     application.add_handler(CommandHandler("bulk_update_xldor", bulk_update_xldor))
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("approve_topup", approve_topup))
-    app.add_handler(CommandHandler("reject_topup", reject_topup))
-    app.add_handler(CommandHandler("approve_beli", approve_beli))
-    app.add_handler(CommandHandler("reject_beli", reject_beli))
-    app.add_handler(CommandHandler("balas", balas))
-    app.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("approve_topup", approve_topup))
+    application.add_handler(CommandHandler("reject_topup", reject_topup))
+    application.add_handler(CommandHandler("approve_beli", approve_beli))
+    application.add_handler(CommandHandler("reject_beli", reject_beli))
 
-    # ===== MESSAGE HANDLERS =====
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    # ================== HANDLER MESSAGE ==================
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    # ===== RUN BOT =====
-    app.run_polling()
+    # ================== JALANKAN BOT ==================
+    application.run_polling()
 
 
 if __name__ == "__main__":
