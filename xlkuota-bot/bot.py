@@ -611,6 +611,7 @@ async def reject_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Transaksi sudah diproses.")
         return
 
+    # ✅ Indentasi harus sejajar dengan baris di atas
     topup.status = "rejected"
     topup.verified_at = datetime.datetime.utcnow()
     session.commit()
@@ -621,6 +622,8 @@ async def reject_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=int(member.telegram_id),
             text=f"❌ Top-up {trx_code} ditolak admin. Saldo kamu tidak berubah."
         )
+
+    await update.message.reply_text(f"❌ Top-up {trx_code} ditolak.")
 
     await update.message.reply_text(f"❌ Top-up {trx_code} ditolak.")
     # ================== ADMIN: VERIFIKASI TOPUP ==================
