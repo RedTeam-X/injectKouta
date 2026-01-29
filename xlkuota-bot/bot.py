@@ -929,8 +929,8 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ Item PPOB '{nama_item}' tidak ditemukan.")
 
     # Update item XL Dor
-elif mode == "xldor":
-    if len(args) < 6:
+    elif mode == "xldor":
+        if len(args) < 6:
         await update.message.reply_text(
             "Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>"
         )
