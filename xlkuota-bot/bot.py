@@ -1019,7 +1019,7 @@ def main():
     # ===== COMMAND HANDLERS =====
     application.add_handler(CommandHandler("balas", balas))
     application.add_handler(CommandHandler("update", update_data))
-    application.add_handler(CommandHandler("bulk_update_xldor", bulk_update_xldor)).  
+    application.add_handler(CommandHandler("bulk_update_xldor", bulk_update_xldor))
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("approve_topup", approve_topup))
     app.add_handler(CommandHandler("reject_topup", reject_topup))
