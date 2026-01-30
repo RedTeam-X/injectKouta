@@ -48,7 +48,7 @@ class Report(Base):
     member_id = Column(Integer)
     category = Column(String)
     message = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 # ================== MESSAGE LOG ==================
 class MessageLog(Base):
@@ -59,7 +59,7 @@ class MessageLog(Base):
     receiver_id = Column(String)
     message = Column(String)
     direction = Column(String)  # user_to_admin / admin_to_user
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 # ================== XL DOR ITEM ==================
 class XLDorItem(Base):
@@ -81,9 +81,10 @@ class PPOBItem(Base):
     harga = Column(Integer)
     deskripsi = Column(String)
     masa_aktif = Column(Integer)
-    kategori = Column(String)  # <--- WAJIB ADA
+    kategori = Column(String)
     aktif = Column(Boolean, default=True)
 
+# ================== TRANSACTION ==================
 class Transaction(Base):
     __tablename__ = "transactions"
 
