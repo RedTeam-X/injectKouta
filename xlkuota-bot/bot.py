@@ -29,11 +29,12 @@ from models import Member, Topup, Report, MessageLog, XLDorItem, PPOBItem, Trans
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         [
+            ["Login"],
             ["XL Dor", "PPOB"],
             ["Cek Saldo", "Top Up Saldo"],
-            ["Lapor Masalah", "Hubungi Admin"],
+            ["Lapor Masalah", "Hubungi Admin"]
         ],
-        resize_keyboard=True,
+        resize_keyboard=True
     )
 
 
@@ -560,7 +561,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ================== HANDLE TEXT (VERSI CLEAN) ==================
+# ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -574,6 +575,107 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     state = context.user_data.get("state", STATE_NONE)
 
+    # ---------- LOGIN ----------
+    if text.lower() == "login":
+        await handle_login(update, context, member, session)
+        return
+
+    # ---------- VALIDASI OTP ----------
+    if not member.verified:
+        success = await validate_otp(update, context, member, session)
+        if success:
+            total_member = session.query(Member).count()
+            await update.message.reply_text(
+                "✅ Login berhasil!\n\n"
+                "*Dashboard Member:*\n"
+                f"🪪 Username: {member.username}\n"
+                f"💵 Saldo: Rp{int(member.saldo):,}\n"
+                f"📊 Transaksi: {member.transaksi}\n"
+                f"💲 Minimal Top-Up: Rp{MIN_TOPUP:,}\n"
+                f"👁️ Jumlah Member: {total_member}",
+                parse_mode="Markdown",
+                reply_markup=main_menu_keyboard()
+            )
+        return
+
+    # ---------- STATE: INPUT NOMOR XL DOR ----------
+    if state == STATE_INPUT_NOMOR_XLDOR:
+        await proses_xldor_nomor(update, context)
+        return
+
+    # ---------- STATE: LAPOR BUG ----------
+    if state == STATE_LAPOR_BUG:
+        tag = auto_tag_report(text)
+        report = Report(user_id=user_id, pesan=text, tag=tag)
+        session.add(report)
+        session.commit()
+
+        await update.message.reply_text("📩 Laporan kamu sudah dikirim ke admin.")
+        context.user_data["state"] = STATE_NONE
+        return
+
+    # ---------- STATE: HUBUNGI ADMIN ----------
+    if state == STATE_HUBUNGI_ADMIN:
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=f"📨 Pesan dari user {tg_user.full_name}:\n\n{text}"
+        )
+        await update.message.reply_text("📩 Pesan kamu sudah dikirim ke admin.")
+        context.user_data["state"] = STATE_NONE
+        return
+
+    # ---------- MENU TEKS ----------
+    if text.lower() == "xl dor":
+        await menu_xldor(update, context)
+        return
+
+    if text.lower() == "ppob":
+        await menu_ppob(update, context)
+        return
+
+    if text.lower() == "lapor masalah":
+        context.user_data["state"] = STATE_LAPOR_BUG
+        await update.message.reply_text("📝 Silakan tulis laporan kamu.")
+        return
+
+    if text.lower() == "hubungi admin":
+        context.user_data["state"] = STATE_HUBUNGI_ADMIN
+        await update.message.reply_text("✉️ Tulis pesan untuk admin.")
+        return
+
+    if text.lower() == "cek saldo":
+        await update.message.reply_text(
+            f"💵 Saldo kamu: Rp{int(member.saldo):,}"
+        )
+        return
+
+    if text.lower() == "top up saldo":
+        if not member.verified:
+            await update.message.reply_text("❌ Kamu harus login dulu.")
+            return
+
+        await update.message.reply_text(
+            f"💰 *Top Up Saldo*\nMinimal: Rp{MIN_TOPUP:,}\n\n"
+            "Silakan transfer ke QRIS berikut lalu kirim bukti foto.",
+            parse_mode="Markdown"
+        )
+
+        if os.path.exists(QRIS_IMAGE_PATH):
+            with open(QRIS_IMAGE_PATH, "rb") as f:
+                await context.bot.send_photo(
+                    chat_id=tg_user.id,
+                    photo=f,
+                    caption="🔶 Scan QRIS ini."
+                )
+        else:
+            await update.message.reply_text("⚠️ QRIS tidak ditemukan.")
+
+        context.user_data["topup_mode"] = True
+        return
+
+    # ---------- DEFAULT ----------
+    await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
+    session.close()
     # ---------- STATE: INPUT NOMOR XL DOR ----------
     if state == STATE_INPUT_NOMOR_XLDOR:
         await proses_xldor_nomor(update, context)
@@ -655,80 +757,77 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- LOGIN ----------
-    if text.lower() == "login":
-        total_member = session.query(Member).count()
+async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
+    total_member = session.query(Member).count()
 
-        if member.verified:
-            await update.message.reply_text(
-                "*Dashboard Member:*\n"
-                f"🪪 Username: {member.username}\n"
-                f"💵 Saldo: Rp{int(member.saldo):,}\n"
-                f"📊 Transaksi: {member.transaksi}\n"
-                f"💲 Minimal Top-Up: Rp{MIN_TOPUP:,}\n"
-                f"👁️ Jumlah Member: {total_member}",
-                parse_mode="Markdown",
-                reply_markup=main_menu_keyboard()
-            )
-            return
-
-        otp = str(random.randint(100000, 999999))
-        member.otp = otp
-        member.otp_created_at = datetime.datetime.utcnow()
-        session.commit()
-
-        await context.bot.send_message(
-            chat_id=tg_user.id,
-            text=f"🔐 OTP kamu: {otp}\nBerlaku 1 menit."
+    # Jika sudah verified → tampilkan dashboard
+    if member.verified:
+        await update.message.reply_text(
+            "*Dashboard Member:*\n"
+            f"👤 Username: {member.username}\n"
+            f"💵 Saldo: Rp{int(member.saldo):,}\n"
+            f"📊 Transaksi: {member.transaksi}\n"
+            f"💲 Minimal Top-Up: Rp{MIN_TOPUP:,}\n"
+            f"👁️ Jumlah Member: {total_member}",
+            parse_mode="Markdown",
+            reply_markup=main_menu_keyboard()
         )
-
-        await update.message.reply_text("📩 OTP dikirim ke DM.")
         return
 
+    # Jika belum verified → kirim OTP
+    otp = str(random.randint(100000, 999999))
+    member.otp = otp
+    member.otp_created_at = datetime.datetime.utcnow()
+    session.commit()
+
+    await context.bot.send_message(
+        chat_id=update.effective_user.id,
+        text=f"🔐 OTP kamu: {otp}\nBerlaku 1 menit."
+    )
+
+    await update.message.reply_text("📩 OTP dikirim ke DM.")
+
     # ---------- OTP VALIDASI ----------
-    if text.isdigit() and not member.verified:
-        if member.otp == text:
-            now = datetime.datetime.utcnow()
+async def validate_otp(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
+    text = update.message.text.strip()
 
-            if member.otp_created_at and (now - member.otp_created_at).total_seconds() <= 60:
-                member.verified = True
-                member.otp = None
-                member.otp_created_at = None
-                session.commit()
+    # OTP harus angka
+    if not text.isdigit():
+        return False
 
-                total_member = session.query(Member).count()
+    # Tidak ada OTP tersimpan
+    if not member.otp:
+        return False
 
-                await update.message.reply_text(
-                    "✅ Login berhasil!\n\n"
-                    "*Dashboard Member:*\n"
-                    f"🪪 Username: {member.username}\n"
-                    f"💵 Saldo: Rp{int(member.saldo):,}\n"
-                    f"📊 Transaksi: {member.transaksi}\n"
-                    f"💲 Minimal Top-Up: Rp{MIN_TOPUP:,}\n"
-                    f"👁️ Jumlah Member: {total_member}",
-                    parse_mode="Markdown",
-                    reply_markup=main_menu_keyboard()
-                )
-                return
+    # OTP cocok
+    if member.otp == text:
+        now = datetime.datetime.utcnow()
 
+        # Cek masa berlaku OTP (1 menit)
+        if member.otp_created_at and (now - member.otp_created_at).total_seconds() <= 60:
+            member.verified = True
             member.otp = None
             member.otp_created_at = None
             session.commit()
+            return True
 
-            await update.message.reply_text(
-                "⏰ OTP kadaluarsa. Klik *Login* untuk minta ulang.",
-                parse_mode="Markdown"
-            )
-            return
+        # OTP expired
+        member.otp = None
+        member.otp_created_at = None
+        session.commit()
 
         await update.message.reply_text(
-            "❌ OTP salah atau kadaluarsa.",
+            "⏰ OTP kadaluarsa. Klik *Login* untuk minta ulang.",
             parse_mode="Markdown"
         )
-        return
+        return False
 
-    # ---------- DEFAULT ----------
-    await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
-    session.close()
+    # OTP salah
+    await update.message.reply_text(
+        "❌ OTP salah.",
+        parse_mode="Markdown"
+    )
+    return False
 
 
 # ================== HANDLE FOTO (TOP-UP) ==================
