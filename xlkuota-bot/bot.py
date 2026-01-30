@@ -4,6 +4,7 @@ import random
 import datetime
 
 from telegram import Update, ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     CallbackQueryHandler,   # <--- WAJIB TAMBAH INI
@@ -299,7 +300,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # tambahkan menu lain sesuai kebutuhan...
 
     # ---------- STATE: LAPOR BUG ----------
-    if state == STATE_LAPOR_BUG:
+   if context.user_data.get("state") == STATE_LAPOR_BUG
         laporan = text
         kategori = auto_tag_report(laporan)
 
@@ -332,7 +333,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- STATE: HUBUNGI ADMIN ----------
-    if state == STATE_HUBUNGI_ADMIN:
+    if context.user_data.get("state") == STATE_HUBUNGI_ADMIN:
         pesan = text
 
         msg_log = MessageLog(
@@ -366,7 +367,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- STATE: MINTA NOMOR TUJUAN ----------
-    if state == STATE_MINTA_NOMOR:
+    if context.user_data.get("state") == STATE_MINTA_NOMOR:
         nomor = text
 
         if not is_valid_phone(nomor):
@@ -426,7 +427,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- STATE: PILIH KATEGORI ----------
-    if state == STATE_PILIH_KATEGORI:
+    if context.user_data.get("state") == STATE_PILIH_KATEGORI:
         if text in PRODUCTS:
             items = PRODUCTS[text]
             item_buttons = [[p[0]] for p in items]
@@ -457,7 +458,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- STATE: PILIH ITEM ----------
-    if state == STATE_PILIH_ITEM:
+    if context.user_data.get("state") == STATE_PILIH_ITEM:
         kategori = context.user_data.get("kategori")
 
         if text == "⬅️ Kembali":
