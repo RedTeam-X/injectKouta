@@ -83,3 +83,16 @@ class PPOBItem(Base):
     masa_aktif = Column(Integer)
     kategori = Column(String)  # <--- WAJIB ADA
     aktif = Column(Boolean, default=True)
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True)
+    jenis = Column(String)          # "PPOB" / "XLDOR"
+    item_nama = Column(String)
+    item_id = Column(Integer)
+    harga = Column(Integer)
+    status = Column(String)         # "pending" / "sukses" / "gagal"
+    keterangan = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
