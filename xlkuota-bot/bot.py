@@ -166,6 +166,74 @@ async def callback_ppob_item(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     context.user_data["ppob_item"] = item_id
     context.user_data["state"] = "input_nomor_ppob"
+
+# ================== PPOB BELI CALLBACK ==================
+async def callback_ppob_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("ppobbeli_", "")
+
+    session = SessionLocal()
+    item = session.query(PPOBItem).filter_by(id=item_id).first()
+    session.close()
+
+    if not item:
+        await query.edit_message_text("❌ Item PPOB tidak ditemukan.")
+        return
+
+    text = (
+        f"🛒 *Konfirmasi Pembelian PPOB*\n\n"
+        f"📦 {item.nama_item}\n"
+        f"💰 Harga: Rp{item.harga}\n\n"
+        f"Jika kamu setuju, admin akan memproses pembelian."
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("✔️ Setuju", callback_data=f"ppobconfirm_{item.id}")],
+        [InlineKeyboardButton("❌ Batal", callback_data=f"ppobcat_{item.kategori}")]
+    ]
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+# ================== PPOB CONFRIM CALLBACK ==================
+async def callback_ppob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("ppobconfirm_", "")
+
+    session = SessionLocal()
+    item = session.query(PPOBItem).filter_by(id=item_id).first()
+    session.close()
+
+    if not item:
+        await query.edit_message_text("❌ Item PPOB tidak ditemukan.")
+        return
+
+    user = query.from_user
+
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"📩 *Tiket Pembelian PPOB*\n\n"
+            f"👤 User: {user.full_name} (ID: {user.id})\n"
+            f"📦 Item: {item.nama_item}\n"
+            f"💰 Harga: Rp{item.harga}\n\n"
+            f"Silakan diproses."
+        ),
+        parse_mode="Markdown"
+    )
+
+    await query.edit_message_text(
+        "🎉 Permintaan pembelian PPOB sudah dikirim ke admin.\n"
+        "Admin akan memproses pesanan kamu.",
+        parse_mode="Markdown"
+    )
     
 # ================== CALLBACK KATEGORI XL DOR ==================
 async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,6 +302,74 @@ async def callback_xldor_item(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     context.user_data["xldor_item"] = item_id
     context.user_data["state"] = "input_nomor_xldor"
+    
+# ================== CALLBACK BELI XL DOR ==================
+async def callback_xldor_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("xldorbeli_", "")
+
+    session = SessionLocal()
+    item = session.query(XLDorItem).filter_by(id=item_id).first()
+    session.close()
+
+    if not item:
+        await query.edit_message_text("❌ Item XL Dor tidak ditemukan.")
+        return
+
+    text = (
+        f"🛒 *Konfirmasi Pembelian XL Dor*\n\n"
+        f"📦 {item.nama_item}\n"
+        f"💰 Harga: Rp{item.harga}\n\n"
+        f"Jika kamu setuju, admin akan memproses pembelian."
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("✔️ Setuju", callback_data=f"xldorconfirm_{item.id}")],
+        [InlineKeyboardButton("❌ Batal", callback_data=f"xldorcat_{item.kategori}")]
+    ]
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+# ================== CALLBACK CONFIRM XL DOR ==================
+async def callback_xldor_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("xldorconfirm_", "")
+
+    session = SessionLocal()
+    item = session.query(XLDorItem).filter_by(id=item_id).first()
+    session.close()
+
+    if not item:
+        await query.edit_message_text("❌ Item XL Dor tidak ditemukan.")
+        return
+
+    user = query.from_user
+
+    # Kirim tiket ke admin
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"📩 *Tiket Pembelian XL Dor*\n\n"
+            f"👤 User: {user.full_name} (ID: {user.id})\n"
+            f"📦 Item: {item.nama_item}\n"
+            f"💰 Harga: Rp{item.harga}\n\n"
+            f"Silakan diproses."
+        ),
+        parse_mode="Markdown"
+    )
+
+    await query.edit_message_text(
+        "🎉 Permintaan pembelian XL Dor sudah dikirim ke admin.\n"
+        "Admin akan memproses pesanan kamu.",
+        parse_mode="Markdown"
+    )
 
 # ================== UTIL & HELPER ==================
 
@@ -1343,14 +1479,21 @@ def main():
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
     application.add_handler(CommandHandler("xldor", menu_xldor))
+    
+    # ================== HANDLER XL DOR ==================
+    application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
+    application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
+    application.add_handler(CallbackQueryHandler(callback_xldor_beli, pattern="^xldorbeli_"))
+    application.add_handler(CallbackQueryHandler(callback_xldor_confirm, pattern="^xldorconfirm_"))
 
     # ================== HANDLER PPOB ==================
     application.add_handler(CommandHandler("ppob", menu_ppob))
     application.add_handler(CallbackQueryHandler(callback_ppob_main, pattern="^ppobmain_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_sub, pattern="^ppobsub_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_item, pattern="^ppobitem_"))
-    application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
-    application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
+    application.add_handler(CallbackQueryHandler(callback_ppob_main, pattern="^ppobcat_"))
+    application.add_handler(CallbackQueryHandler(callback_ppob_beli, pattern="^ppobbeli_"))
+    application.add_handler(CallbackQueryHandler(callback_ppob_confirm, pattern="^ppobconfirm_"))
 
     # ================== HANDLER MESSAGE ==================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
