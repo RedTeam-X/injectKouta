@@ -1057,12 +1057,15 @@ async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
         return
 
-    args = context.args
-    if len(args) < 1:
+    import shlex
+    message = update.message
+    args = shlex.split(message.text)
+
+    if len(args) < 2:
         await update.message.reply_text("Format: /update <saldo|ppob|xldor> ...")
         return
 
-    mode = args[0].lower()
+    mode = args[1].lower()
     session = SessionLocal()
 
     # Update saldo user
