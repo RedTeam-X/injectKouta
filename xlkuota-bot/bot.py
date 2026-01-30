@@ -317,7 +317,7 @@ async def callback_ppob_confirm(update: Update, context: ContextTypes.DEFAULT_TY
         "🎉 Permintaan pembelian PPOB sudah dikirim ke admin.\nStatus: *pending*.",
         parse_mode="Markdown",
     )
-    # ================== MENU XL DOR (KATEGORI) ==================
+# ================== MENU XL DOR (KATEGORI) ==================
 async def menu_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
 
@@ -338,18 +338,242 @@ async def menu_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         session.close()
 
+    # Jika kategori kosong → fallback tampilkan semua item
     if not kategori_list:
-        await sender.reply_text("❌ Tidak ada kategori XL Dor tersedia.")
+        await sender.reply_text(
+            "⚠️ XL Dor tidak memiliki kategori.\n"
+            "Menampilkan semua item yang tersedia."
+        )
+        await tampilkan_semua_xldor(sender)
         return
 
-    keyboard = [
-        [InlineKeyboardButton(k[0], callback_data=f"xldorcat_{k[0]}")]
-        for k in kategori_list
-    ]
+    keyboard = []
+    for k in kategori_list:
+        kategori = k[0] if k[0] else "Tanpa Kategori"
+        keyboard.append([InlineKeyboardButton(kategori, callback_data=f"xldorcat_{kategori}")])
 
     await sender.reply_text(
         "📦 Silakan pilih kategori XL Dor:",
         reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+# ================== FALLBACK: TAMPILKAN SEMUA ITEM XL DOR ==================
+async def tampilkan_semua_xldor(sender):
+    session = SessionLocal()
+    try:
+        items = session.query(XLDorItem).filter(XLDorItem.aktif == True).all()
+    finally:
+        session.close()
+
+    if not items:
+        await sender.reply_text("❌ Tidak ada item XL Dor tersedia.")
+        return
+
+    text = "📦 *Daftar XL Dor Tersedia:*\n\n"
+    for item in items:
+        kategori = item.kategori if item.kategori else "Tanpa Kategori"
+        text += (
+            f"• {item.nama_item}\n"
+            f"  Harga: Rp{int(item.harga):,}\n"
+            f"  Kategori: {kategori}\n\n"
+        )
+
+    await sender.reply_text(text, parse_mode="Markdown")
+
+
+# ================== XL DOR: KATEGORI → ITEM ==================
+async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    kategori = query.data.replace("xldorcat_", "")
+
+    session = SessionLocal()
+    try:
+        items = (
+            session.query(XLDorItem)
+            .filter(XLDorItem.aktif == True)
+            .filter(XLDorItem.kategori == kategori)
+            .order_by(XLDorItem.harga.asc())
+            .all()
+        )
+    finally:
+        session.close()
+
+    # Jika kategori ada tapi item kosong → fallback
+    if not items:
+        await query.edit_message_text(
+            f"⚠️ Tidak ada item untuk kategori *{kategori}*.\n"
+            "Menampilkan semua item XL Dor.",
+            parse_mode="Markdown"
+        )
+        await tampilkan_semua_xldor(query.message)
+        return
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                f"{item.nama_item} - Rp{int(item.harga):,}",
+                callback_data=f"xldoritem_{item.id}",
+            )
+        ]
+        for item in items
+    ]
+
+    await query.edit_message_text(
+        f"📦 XL Dor: *{kategori}*\nPilih paket:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
+    )
+
+
+# ================== XL DOR: ITEM DETAIL ==================
+async def callback_xldor_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("xldoritem_", "")
+
+    session = SessionLocal()
+    try:
+        item = session.query(XLDorItem).filter_by(id=item_id, aktif=True).first()
+    finally:
+        session.close()
+
+    if not item:
+        await query.edit_message_text("❌ Item XL Dor tidak ditemukan.")
+        return
+
+    text = (
+        f"📦 *{item.nama_item}*\n"
+        f"💰 Harga: Rp{int(item.harga):,}\n"
+        f"📝 {item.deskripsi}\n"
+        f"⏳ Masa Aktif: {item.masa_aktif} Hari\n"
+        f"📂 Kategori: {item.kategori if item.kategori else 'Tanpa Kategori'}\n"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("🛒 Beli Sekarang", callback_data=f"xldorbeli_{item.id}")],
+        [InlineKeyboardButton("⬅️ Kembali", callback_data=f"xldorcat_{item.kategori}")],
+    ]
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
+    )
+
+
+# ================== XL DOR: BELI → INPUT NOMOR ==================
+async def callback_xldor_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("xldorbeli_", "")
+
+    context.user_data["xldor_item"] = item_id
+    context.user_data["state"] = STATE_INPUT_NOMOR_XLDOR
+
+    await query.edit_message_text("📱 Masukkan nomor tujuan XL Dor:")
+
+
+# ================== XL DOR: PROSES NOMOR ==================
+async def proses_xldor_nomor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    nomor = update.message.text.strip()
+
+    if not is_valid_phone(nomor):
+        await update.message.reply_text("❌ Nomor tidak valid. Masukkan nomor yang benar.")
+        return
+
+    item_id = context.user_data.get("xldor_item")
+
+    session = SessionLocal()
+    try:
+        item = session.query(XLDorItem).filter_by(id=item_id, aktif=True).first()
+    finally:
+        session.close()
+
+    if not item:
+        await update.message.reply_text("❌ Item XL Dor tidak ditemukan.")
+        return
+
+    text = (
+        f"🛒 *Konfirmasi Pembelian XL Dor*\n\n"
+        f"📱 Nomor: {nomor}\n"
+        f"📦 {item.nama_item}\n"
+        f"💰 Harga: Rp{int(item.harga):,}\n\n"
+        f"Jika setuju, admin akan memproses pembelian."
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("✔️ Setuju", callback_data=f"xldorconfirm_{item.id}")],
+        [InlineKeyboardButton("❌ Batal", callback_data=f"xldorcat_{item.kategori}")],
+    ]
+
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
+    )
+
+    context.user_data["state"] = STATE_NONE
+
+
+# ================== XL DOR: BUAT TRANSAKSI + TIKET ADMIN ==================
+async def callback_xldor_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = query.data.replace("xldorconfirm_", "")
+
+    session = SessionLocal()
+    try:
+        item = session.query(XLDorItem).filter_by(id=item_id, aktif=True).first()
+        if not item:
+            await query.edit_message_text("❌ Item XL Dor tidak ditemukan.")
+            return
+
+        user = query.from_user
+
+        trx = Transaction(
+            user_id=str(user.id),
+            jenis="XLDOR",
+            item_nama=item.nama_item,
+            item_id=item.id,
+            harga=item.harga,
+            status="pending",
+        )
+        session.add(trx)
+        session.commit()
+        trx_id = trx.id
+    finally:
+        session.close()
+
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"📩 *Tiket Pembelian XL Dor*\n\n"
+            f"🧾 ID: {trx_id}\n"
+            f"👤 User: {user.full_name} (ID: {user.id})\n"
+            f"📦 Item: {item.nama_item}\n"
+            f"💰 Harga: Rp{int(item.harga):,}\n\n"
+            f"Pilih aksi:"
+        ),
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_{trx_id}"),
+                    InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_{trx_id}"),
+                ]
+            ]
+        ),
+        parse_mode="Markdown",
+    )
+
+    await query.edit_message_text(
+        "🎉 Permintaan pembelian XL Dor sudah dikirim ke admin.\nStatus: *pending*.",
+        parse_mode="Markdown",
     )
 
 
