@@ -1324,7 +1324,8 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================== MAIN ==================
 
 def main():
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    migrate_ppob_add_kategori()   # <--- WAJIB DI SINI
+    application = Application.builder().token(BOT_TOKEN).build()
 
     # ================== HANDLER COMMAND ==================
     application.add_handler(CommandHandler("start", start))
