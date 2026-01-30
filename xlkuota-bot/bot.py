@@ -9,8 +9,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes, filters
+    CallbackQueryHandler, ContextTypes, filters
 )
 
 from PIL import Image, ImageDraw, ImageFont
