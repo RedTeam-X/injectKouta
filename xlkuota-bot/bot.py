@@ -53,6 +53,118 @@ async def menu_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📦 Silakan pilih kategori XL Dor:",
         reply_markup=reply_markup
     )
+    
+# ================== PPOB MENU ==================
+async def menu_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [
+            InlineKeyboardButton("Axis", callback_data="ppobmain_Axis"),
+            InlineKeyboardButton("Indosat", callback_data="ppobmain_Indosat")
+        ],
+        [
+            InlineKeyboardButton("Telkomsel", callback_data="ppobmain_Telkomsel"),
+            InlineKeyboardButton("Masa Aktif", callback_data="ppobmain_MasaAktif")
+        ],
+        [
+            InlineKeyboardButton("XL Dor", callback_data="ppobmain_XLDor")
+        ]
+    ]
+
+    await update.message.reply_text(
+        "📦 Silakan pilih kategori PPOB:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ================== PPOB MAIN CATEGORY CALLBACK ==================
+async def callback_ppob_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    kategori = query.data.split("_")[1]
+
+    subkategori_map = {
+        "Axis": ["AXIS GAME", "Mini YouTube & Sosmed", "Sosmed & Chat", "Kuota Nasional Harian"],
+        "Indosat": ["Freedom U", "Freedom Internet Lokal"],
+        "Telkomsel": ["Combo Data", "Ilmupedia"],
+        "MasaAktif": ["Telkomsel", "XL", "Indosat", "Axis"],
+        "XLDor": ["XTRA DIGITAL", "FLEX MAXX", "AKRAB"]
+    }
+
+    if kategori not in subkategori_map:
+        await query.edit_message_text("❌ Kategori tidak ditemukan.")
+        return
+
+    keyboard = []
+    for sub in subkategori_map[kategori]:
+        keyboard.append([
+            InlineKeyboardButton(
+                text=sub,
+                callback_data=f"ppobsub_{kategori}_{sub}"
+            )
+        ])
+
+    await query.edit_message_text(
+        f"📦 PPOB: {kategori}\nPilih sub‑kategori:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ================== PPOB SUB CATEGORY CALLBACK ==================
+async def callback_ppob_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    _, kategori, subkategori = query.data.split("_")
+
+    session = SessionLocal()
+    items = session.query(PPOBItem).filter_by(
+        kategori=f"{kategori} - {subkategori}",
+        aktif=True
+    ).all()
+
+    if not items:
+        await query.edit_message_text(f"❌ Tidak ada item untuk {subkategori}.")
+        return
+
+    keyboard = []
+    for item in items:
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"{item.deskripsi} - Rp{int(item.harga)}",
+                callback_data=f"ppobitem_{item.id}"
+            )
+        ])
+
+    await query.edit_message_text(
+        f"📦 PPOB: {kategori} → {subkategori}\nPilih item:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ================== PPOB ITEM CALLBACK ==================
+async def callback_ppob_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item_id = int(query.data.split("_")[1])
+
+    session = SessionLocal()
+    item = session.query(PPOBItem).filter_by(id=item_id).first()
+
+    if not item:
+        await query.edit_message_text("❌ Item tidak ditemukan.")
+        return
+
+    text = (
+        f"📦 *{item.deskripsi}*\n"
+        f"💰 Harga: Rp {int(item.harga)}\n"
+        f"⏳ Masa Aktif: {item.masa_aktif} Hari\n\n"
+        f"Masukkan nomor tujuan untuk pembelian."
+    )
+
+    await query.edit_message_text(text, parse_mode="Markdown")
+
+    context.user_data["ppob_item"] = item_id
+    context.user_data["state"] = "input_nomor_ppob"
+    
 # ================== CALLBACK KATEGORI XL DOR ==================
 async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1149,6 +1261,11 @@ def main():
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
     application.add_handler(CommandHandler("xldor", menu_xldor))
+    # ================== HANDLER PPOB ==================
+    application.add_handler(CommandHandler("ppob", menu_ppob))
+    application.add_handler(CallbackQueryHandler(callback_ppob_main, pattern="^ppobmain_"))
+    application.add_handler(CallbackQueryHandler(callback_ppob_sub, pattern="^ppobsub_"))
+    application.add_handler(CallbackQueryHandler(callback_ppob_item, pattern="^ppobitem_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
 
