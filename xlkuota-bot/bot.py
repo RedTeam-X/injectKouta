@@ -295,6 +295,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
+    # WAJIB: buat session dan ambil member
+    session = SessionLocal()
+    member = session.query(Member).filter_by(
+        telegram_id=str(update.effective_user.id)
+    ).first()
+
     if text == "XL Dor":
         await menu_xldor(update, context)
     # tambahkan menu lain sesuai kebutuhan...
