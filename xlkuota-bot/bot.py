@@ -1060,167 +1060,172 @@ async def balas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Pesan teks terkirim ke user.")
 
 
-# ================== ADMIN: UPDATE DATA ==================
+# ================== ADMIN: UPDATE DATA (MULTI-LINE FINAL) ==================
 async def update_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
         return
 
-    import shlex
-    message = update.message
-    args = shlex.split(message.text)
-
-    # args:
-    # 0 = /update
-    # 1 = ppob|saldo|xldor
-    # 2 = nama_item / user_id
-    # 3 = harga / jumlah saldo
-    # 4 = deskripsi
-    # 5 = masa_aktif
-    # 6 = kategori
-    # 7 = aktif/nonaktif
-
-    if len(args) < 2:
-        await update.message.reply_text("Format: /update <saldo|ppob|xldor> ...")
-        return
-
-    mode = args[1].lower()
     session = SessionLocal()
+    message = update.message.text.strip()
 
-    # ==========================
-    # PPOB UPDATE (FINAL)
-    # ==========================
-    if mode == "ppob":
-        if len(args) < 8:
-            await update.message.reply_text(
-                "Format PPOB salah.\n"
-                "Contoh:\n"
-                '/update ppob AXIS_Game_05GB_7H 5049 "Kuota Game 0.5GB, 7 Hari" 7 "Axis - AXIS GAME" aktif'
-            )
-            return
+    # Pisahkan pesan menjadi banyak baris
+    lines = message.split("\n")
 
-        nama_item = args[2]
-        harga = args[3]
-        deskripsi = args[4]
-        masa_aktif = args[5]
-        kategori = args[6]
-        status = args[7].lower()
+    results = []
 
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Hanya proses baris yang dimulai dengan /update
+        if not line.startswith("/update"):
+            continue
+
+        import shlex
         try:
-            harga = int(harga)
-            masa_aktif = int(masa_aktif)
+            args = shlex.split(line)
         except:
-            await update.message.reply_text("❌ Harga dan masa aktif harus angka.")
-            return
+            results.append(f"❌ Gagal parsing: {line}")
+            continue
 
-        aktif = True if status == "aktif" else False
+        if len(args) < 2:
+            results.append(f"❌ Format salah: {line}")
+            continue
 
-        # cek apakah item sudah ada
-        item = session.query(PPOBItem).filter_by(nama_item=nama_item).first()
+        mode = args[1].lower()
 
-        if item:
-            # update
-            item.harga = harga
-            item.deskripsi = deskripsi
-            item.masa_aktif = masa_aktif
-            item.kategori = kategori
-            item.aktif = aktif
-            session.commit()
+        # ==========================
+        # PPOB UPDATE
+        # ==========================
+        if mode == "ppob":
+            if len(args) < 8:
+                results.append(
+                    f"❌ Format PPOB salah:\n{line}\n"
+                    "Contoh:\n"
+                    '/update ppob AXIS_Game_05GB_7H 5049 "Kuota Game 0.5GB, 7 Hari" 7 "Axis - AXIS GAME" aktif'
+                )
+                continue
 
-            await update.message.reply_text(
-                f"✅ PPOB diupdate:\n"
-                f"{nama_item}\nHarga: {harga}\nKategori: {kategori}"
-            )
-        else:
-            # insert baru
-            new_item = PPOBItem(
-                nama_item=nama_item,
-                harga=harga,
-                deskripsi=deskripsi,
-                masa_aktif=masa_aktif,
-                kategori=kategori,
-                aktif=aktif
-            )
-            session.add(new_item)
-            session.commit()
+            nama_item = args[2]
+            harga = args[3]
+            deskripsi = args[4]
+            masa_aktif = args[5]
+            kategori = args[6]
+            status = args[7].lower()
 
-            await update.message.reply_text(
-                f"✅ PPOB baru ditambahkan:\n"
-                f"{nama_item}\nHarga: {harga}\nKategori: {kategori}"
-            )
+            try:
+                harga = int(harga)
+                masa_aktif = int(masa_aktif)
+            except:
+                results.append(f"❌ Harga/masa aktif harus angka: {line}")
+                continue
 
-        return
+            aktif = True if status == "aktif" else False
 
-    # ==========================
-    # UPDATE SALDO USER
-    # ==========================
-    if mode == "saldo":
-        if len(args) < 4:
-            await update.message.reply_text("Format: /update saldo <id_user> <jumlah>")
-            return
+            item = session.query(PPOBItem).filter_by(nama_item=nama_item).first()
 
-        user_id = args[2]
-        jumlah = int(args[3])
+            if item:
+                item.harga = harga
+                item.deskripsi = deskripsi
+                item.masa_aktif = masa_aktif
+                item.kategori = kategori
+                item.aktif = aktif
+                results.append(f"✔ Update PPOB: {nama_item}")
+            else:
+                new_item = PPOBItem(
+                    nama_item=nama_item,
+                    harga=harga,
+                    deskripsi=deskripsi,
+                    masa_aktif=masa_aktif,
+                    kategori=kategori,
+                    aktif=aktif
+                )
+                session.add(new_item)
+                results.append(f"➕ Tambah PPOB: {nama_item}")
 
-        member = session.query(Member).filter_by(telegram_id=str(user_id)).first()
-        if member:
-            saldo_awal = member.saldo
-            member.saldo += jumlah
-            session.commit()
+            continue
 
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=f"🎉 Saldo kamu bertambah Rp{jumlah}!\nSaldo awal: Rp{saldo_awal}\nSaldo sekarang: Rp{member.saldo}"
-            )
+        # ==========================
+        # UPDATE SALDO USER
+        # ==========================
+        if mode == "saldo":
+            if len(args) < 4:
+                results.append(f"❌ Format saldo salah: {line}")
+                continue
 
-            await update.message.reply_text(f"✅ Saldo user {user_id} berhasil diupdate.")
-        else:
-            await update.message.reply_text("❌ User tidak ditemukan.")
+            user_id = args[2]
+            jumlah = args[3]
 
-        return
+            try:
+                jumlah = int(jumlah)
+            except:
+                results.append(f"❌ Jumlah saldo harus angka: {line}")
+                continue
 
-    # ==========================
-    # UPDATE XL DOR
-    # ==========================
-    if mode == "xldor":
-        if len(args) < 7:
-            await update.message.reply_text(
-                "Format: /update xldor <nama_item> <harga> <deskripsi> <masa_aktif> <status>"
-            )
-            return
+            member = session.query(Member).filter_by(telegram_id=str(user_id)).first()
+            if member:
+                saldo_awal = member.saldo
+                member.saldo += jumlah
+                results.append(f"✔ Saldo {user_id}: {saldo_awal} → {member.saldo}")
+            else:
+                results.append(f"❌ User tidak ditemukan: {user_id}")
 
-        nama_item = args[2]
-        harga = int(args[3])
-        deskripsi = args[4]
-        masa_aktif = int(args[5])
-        status = args[6].lower()
+            continue
 
-        aktif = True if status == "aktif" else False
+        # ==========================
+        # UPDATE XL DOR
+        # ==========================
+        if mode == "xldor":
+            if len(args) < 7:
+                results.append(f"❌ Format XL Dor salah: {line}")
+                continue
 
-        item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+            nama_item = args[2]
+            harga = args[3]
+            deskripsi = args[4]
+            masa_aktif = args[5]
+            status = args[6].lower()
 
-        if item:
-            item.harga = harga
-            item.deskripsi = deskripsi
-            item.masa_aktif = masa_aktif
-            item.aktif = aktif
-        else:
-            item = XLDorItem(
-                nama_item=nama_item,
-                harga=harga,
-                deskripsi=deskripsi,
-                masa_aktif=masa_aktif,
-                aktif=aktif
-            )
-            session.add(item)
+            try:
+                harga = int(harga)
+                masa_aktif = int(masa_aktif)
+            except:
+                results.append(f"❌ Harga/masa aktif harus angka: {line}")
+                continue
 
-        session.commit()
-        await update.message.reply_text(f"✅ Item XL Dor '{nama_item}' berhasil disimpan.")
-        return
+            aktif = True if status == "aktif" else False
 
-    # ==========================
-    # MODE TIDAK DIKENAL
-    # ==========================
-    await update.message.reply_text("❌ Mode update tidak dikenal.")
+            item = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+
+            if item:
+                item.harga = harga
+                item.deskripsi = deskripsi
+                item.masa_aktif = masa_aktif
+                item.aktif = aktif
+                results.append(f"✔ Update XL Dor: {nama_item}")
+            else:
+                new_item = XLDorItem(
+                    nama_item=nama_item,
+                    harga=harga,
+                    deskripsi=deskripsi,
+                    masa_aktif=masa_aktif,
+                    aktif=aktif
+                )
+                session.add(new_item)
+                results.append(f"➕ Tambah XL Dor: {nama_item}")
+
+            continue
+
+        # ==========================
+        # MODE TIDAK DIKENAL
+        # ==========================
+        results.append(f"❌ Mode tidak dikenal: {line}")
+
+    session.commit()
+    session.close()
+
+    await update.message.reply_text("\n".join(results))
     
 # ================== BULK UPDATE XL DOR ==================
 async def bulk_update_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
