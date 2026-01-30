@@ -78,7 +78,8 @@ class PPOBItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nama_item = Column(String, unique=True, index=True)
-    harga = Column(Float)
+    harga = Column(Integer)
     deskripsi = Column(String)
-    masa_aktif = Column(Integer)  # dalam hari
+    masa_aktif = Column(Integer)
+    kategori = Column(String)  # <--- WAJIB ADA
     aktif = Column(Boolean, default=True)
