@@ -3,17 +3,19 @@ import os
 import random
 import datetime
 
+from db import SessionLocal, migrate_ppob_add_kategori
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler,   # <--- WAJIB TAMBAH INI
+    CallbackQueryHandler,
     ContextTypes, filters
 )
+
 from PIL import Image, ImageDraw, ImageFont
 
 from config import BOT_TOKEN, ADMIN_CHAT_ID, MIN_TOPUP, QRIS_IMAGE_PATH
-from db import SessionLocal
 
 # ================== STATE MACHINE ==================
 
@@ -1322,9 +1324,9 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Gagal: {gagal}"
     )
     # ================== MAIN ==================
-
 def main():
-    migrate_ppob_add_kategori()   # <--- WAJIB DI SINI
+    migrate_ppob_add_kategori()   # WAJIB DI SINI
+
     application = Application.builder().token(BOT_TOKEN).build()
 
     # ================== HANDLER COMMAND ==================
@@ -1337,6 +1339,7 @@ def main():
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
     application.add_handler(CommandHandler("xldor", menu_xldor))
+
     # ================== HANDLER PPOB ==================
     application.add_handler(CommandHandler("ppob", menu_ppob))
     application.add_handler(CallbackQueryHandler(callback_ppob_main, pattern="^ppobmain_"))
