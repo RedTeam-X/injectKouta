@@ -18,6 +18,7 @@ def migrate_ppob_add_kategori():
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE ppob_items ADD COLUMN kategori VARCHAR"))
+            conn.commit()
             print("Kolom kategori berhasil ditambahkan.")
         except ProgrammingError as e:
             if "already exists" in str(e):
