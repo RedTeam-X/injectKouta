@@ -27,14 +27,14 @@ STATE_HUBUNGI_ADMIN = "hubungi_admin"
 
 # ================== MENU UTAMA ==================
 
-def main_menu_keyboard():
-    return ReplyKeyboardMarkup(
-        [
-            ["XL Dor", "Login", "PPOB"],
-            ["Top Up", "Lapor Masalah", "Hubungi Admin"],
-            ["Tutorial Login", "Tutorial Top Up"]
-        ],
-        resize_keyboard=True
+async def menu_utama(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📱 PPOB", callback_data="menu_ppob")],
+        [InlineKeyboardButton("📦 XL Dor", callback_data="menu_xldor")],
+    ]
+    await update.message.reply_text(
+        "📲 Silakan pilih menu:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 # # ================== MENU XL DOR (KATEGORI) ==================
@@ -370,7 +370,84 @@ async def callback_xldor_confirm(update: Update, context: ContextTypes.DEFAULT_T
         "Admin akan memproses pesanan kamu.",
         parse_mode="Markdown"
     )
+    
+async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
+    if query.from_user.id != ADMIN_CHAT_ID:
+        return
+
+    trx_id = query.data.replace("adminapprove_", "")
+
+    session = SessionLocal()
+    trx = session.query(Transaction).filter_by(id=trx_id).first()
+    if not trx or trx.status != "pending":
+        session.close()
+        await query.edit_message_text("❌ Transaksi tidak ditemukan / bukan pending.")
+        return
+
+    member = session.query(Member).filter_by(telegram_id=trx.user_id).first()
+    if not member:
+        session.close()
+        await query.edit_message_text("❌ User tidak ditemukan.")
+        return
+
+    if member.saldo < trx.harga:
+        trx.status = "gagal"
+        trx.keterangan = "Saldo tidak cukup"
+        session.commit()
+        session.close()
+        await query.edit_message_text("❌ Gagal: saldo user tidak cukup.")
+        await context.bot.send_message(
+            chat_id=int(trx.user_id),
+            text=f"❌ Transaksi {trx.jenis} *{trx.item_nama}* gagal.\nAlasan: saldo tidak cukup.",
+            parse_mode="Markdown"
+        )
+        return
+
+    member.saldo -= trx.harga
+    trx.status = "sukses"
+    trx.keterangan = "Approved admin"
+    session.commit()
+    session.close()
+
+    await query.edit_message_text(f"✅ Transaksi {trx_id} disetujui dan saldo dipotong.")
+    await context.bot.send_message(
+        chat_id=int(trx.user_id),
+        text=f"✅ Transaksi {trx.jenis} *{trx.item_nama}* berhasil.\nSaldo kamu sudah dipotong Rp{trx.harga}.",
+        parse_mode="Markdown"
+    )
+
+# ================== ADMIN APPROVE/REJECT+ POTONG SALDO ==================
+async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.from_user.id != ADMIN_CHAT_ID:
+        return
+
+    trx_id = query.data.replace("adminreject_", "")
+
+    session = SessionLocal()
+    trx = session.query(Transaction).filter_by(id=trx_id).first()
+    if not trx or trx.status != "pending":
+        session.close()
+        await query.edit_message_text("❌ Transaksi tidak ditemukan / bukan pending.")
+        return
+
+    trx.status = "gagal"
+    trx.keterangan = "Ditolak admin"
+    session.commit()
+    session.close()
+
+    await query.edit_message_text(f"❌ Transaksi {trx_id} ditolak.")
+    await context.bot.send_message(
+        chat_id=int(trx.user_id),
+        text=f"❌ Transaksi {trx.jenis} *{trx.item_nama}* ditolak admin.",
+        parse_mode="Markdown"
+    )
+    
 # ================== UTIL & HELPER ==================
 
 def get_or_create_member(session, tg_user):
@@ -1463,6 +1540,33 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Berhasil: {sukses}\n"
         f"Gagal: {gagal}"
     )
+    
+# ================== RIWAYAT TRANSAKSI==================
+async def riwayat_transaksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    session = SessionLocal()
+    trxs = (
+        session.query(Transaction)
+        .filter_by(user_id=str(user.id))
+        .order_by(Transaction.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    session.close()
+
+    if not trxs:
+        await update.message.reply_text("📄 Belum ada riwayat transaksi.")
+        return
+
+    lines = []
+    for t in trxs:
+        lines.append(
+            f"🧾 {t.id} | {t.jenis} | {t.item_nama}\n"
+            f"💰 Rp{t.harga} | {t.status} | {t.created_at.strftime('%d-%m %H:%M')}"
+        )
+
+    await update.message.reply_text("\n\n".join(lines))
+    
     # ================== MAIN ==================
 def main():
     migrate_ppob_add_kategori()   # WAJIB DI SINI
@@ -1479,6 +1583,7 @@ def main():
     application.add_handler(CommandHandler("approve_beli", approve_beli))
     application.add_handler(CommandHandler("reject_beli", reject_beli))
     application.add_handler(CommandHandler("xldor", menu_xldor))
+    application.add_handler(CommandHandler("riwayat", riwayat_transaksi))
     
     # ================== HANDLER XL DOR ==================
     application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
@@ -1494,6 +1599,12 @@ def main():
     application.add_handler(CallbackQueryHandler(callback_ppob_main, pattern="^ppobcat_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_beli, pattern="^ppobbeli_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_confirm, pattern="^ppobconfirm_"))
+
+    # ================== HANDLER ADMIN ==================
+    application.add_handler(CallbackQueryHandler(menu_ppob, pattern="^menu_ppob$"))
+    application.add_handler(CallbackQueryHandler(menu_xldor, pattern="^menu_xldor$"))
+    application.add_handler(CallbackQueryHandler(admin_approve, pattern="^adminapprove_"))
+    application.add_handler(CallbackQueryHandler(admin_reject, pattern="^adminreject_"))
 
     # ================== HANDLER MESSAGE ==================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
