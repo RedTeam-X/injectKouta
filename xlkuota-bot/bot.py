@@ -300,37 +300,37 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # tambahkan menu lain sesuai kebutuhan...
 
 # ---------- STATE: LAPOR BUG ----------
-if context.user_data.get("state") == STATE_LAPOR_BUG:
-    laporan = text
-    kategori = auto_tag_report(laporan)
+    if context.user_data.get("state") == STATE_LAPOR_BUG:
+        laporan = text
+        kategori = auto_tag_report(laporan)
 
-    report = Report(
-        member_id=member.id,
-        category=kategori,
-        message=laporan,
-        created_at=datetime.datetime.utcnow()
-    )
-    session.add(report)
-    session.commit()
+        report = Report(
+            member_id=member.id,
+            category=kategori,
+            message=laporan,
+            created_at=datetime.datetime.utcnow()
+        )
+        session.add(report)
+        session.commit()
 
-    await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=(
-            "🐞 *Laporan Baru dari User*\n"
-            f"Kategori: {kategori}\n"
-            f"User: {member.username} (ID: {member.telegram_id})\n\n"
-            f"Isi laporan:\n{laporan}"
-        ),
-        parse_mode="Markdown"
-    )
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                "🐞 *Laporan Baru dari User*\n"
+                f"Kategori: {kategori}\n"
+                f"User: {member.username} (ID: {member.telegram_id})\n\n"
+                f"Isi laporan:\n{laporan}"
+            ),
+            parse_mode="Markdown"
+        )
 
-    await update.message.reply_text(
-        "✅ Laporan kamu sudah dikirim ke admin.",
-        reply_markup=main_menu_keyboard()
-    )
+        await update.message.reply_text(
+            "✅ Laporan kamu sudah dikirim ke admin.",
+            reply_markup=main_menu_keyboard()
+        )
 
-    context.user_data["state"] = STATE_NONE
-    return
+        context.user_data["state"] = STATE_NONE
+        return
 
     # ---------- STATE: HUBUNGI ADMIN ----------
     if context.user_data.get("state") == STATE_HUBUNGI_ADMIN:
