@@ -8,7 +8,7 @@ from db import SessionLocal, migrate_ppob_add_kategori
 from telegram import Update, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
+    Application, CommandHandler, MessageHandler,
     CallbackQueryHandler,
     ContextTypes, filters
 )
