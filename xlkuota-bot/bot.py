@@ -381,53 +381,6 @@ async def tampilkan_semua_xldor(sender):
 
     await sender.reply_text(text, parse_mode="Markdown")
 
-
-# ================== XL DOR: KATEGORI → ITEM ==================
-async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    kategori = query.data.replace("xldorcat_", "")
-
-    session = SessionLocal()
-    try:
-        items = (
-            session.query(XLDorItem)
-            .filter(XLDorItem.aktif == True)
-            .filter(XLDorItem.kategori == kategori)
-            .order_by(XLDorItem.harga.asc())
-            .all()
-        )
-    finally:
-        session.close()
-
-    # Jika kategori ada tapi item kosong → fallback
-    if not items:
-        await query.edit_message_text(
-            f"⚠️ Tidak ada item untuk kategori *{kategori}*.\n"
-            "Menampilkan semua item XL Dor.",
-            parse_mode="Markdown"
-        )
-        await tampilkan_semua_xldor(query.message)
-        return
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                f"{item.nama_item} - Rp{int(item.harga):,}",
-                callback_data=f"xldoritem_{item.id}",
-            )
-        ]
-        for item in items
-    ]
-
-    await query.edit_message_text(
-        f"📦 XL Dor: *{kategori}*\nPilih paket:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown",
-    )
-
-
 # ================== XL DOR: ITEM DETAIL ==================
 async def callback_xldor_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
