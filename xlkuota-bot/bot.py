@@ -761,7 +761,7 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.close()
 
     await update.message.reply_text("✅ Data XL Dor berhasil diimport dari file.")
-# ================== IMPORT PPOB ==================
+# ================== TAMPILKAN MENU PPOB ==================
 async def tampilkanppobitems(sender, kategori):
     session = SessionLocal()
     items = session.query(PPOBItem).filter(
@@ -784,6 +784,26 @@ async def tampilkanppobitems(sender, kategori):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     
+# ================== IMPORT FILE (AUTO DETECT) ==================
+async def import_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("❌ Kamu tidak punya izin.")
+        return
+
+    if not update.message.document:
+        await update.message.reply_text("❌ Kirim file teks data.")
+        return
+
+    file = await update.message.document.get_file()
+    content = await file.download_as_bytearray()
+    text = content.decode("utf-8")
+
+    # Deteksi isi file
+    if "•XL" in text or "XL (" in text:
+        await import_xldor(update, context)
+    else:
+        await import_ppob(update, context)    
+  await update.message.reply_text("✅ Data PPOB berhasil diimport dari file.")      
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
