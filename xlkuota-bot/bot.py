@@ -761,6 +761,28 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.close()
 
     await update.message.reply_text("✅ Data XL Dor berhasil diimport dari file.")
+# ================== IMPORT PPOB ==================
+async def tampilkanppobitems(sender, kategori):
+    session = SessionLocal()
+    items = session.query(PPOBItem).filter(
+        PPOBItem.kategori == kategori,
+        PPOBItem.aktif == True
+    ).all()
+    session.close()
+
+    if not items:
+        await sender.reply_text(f"❌ Tidak ada item untuk kategori {kategori}")
+        return
+
+    keyboard = []
+    for item in items:
+        label = f"{item.nama_item} - Rp {item.harga:,}"
+        keyboard.append([InlineKeyboardButton(label, callbackdata=f"ppobitem_{item.id}")])
+
+    await sender.reply_text(
+        f"📦 PPOB ({kategori})",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1326,6 +1348,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
     application.add_handler(MessageHandler(filters.Document.ALL, import_xldor))
+    application.add_handler(MessageHandler(filters.Document.ALL, import_ppob))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
