@@ -761,8 +761,8 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.close()
 
     await update.message.reply_text("✅ Data XL Dor berhasil diimport dari file.")
-# ================== TAMPILKAN MENU PPOB ==================
-async def tampilkanppobitems(sender, kategori):
+# ================== TAMPILKAN PPOB ITEMS ==================
+async def tampilkan_ppob_items(sender, kategori):
     session = SessionLocal()
     items = session.query(PPOBItem).filter(
         PPOBItem.kategori == kategori,
@@ -777,7 +777,7 @@ async def tampilkanppobitems(sender, kategori):
     keyboard = []
     for item in items:
         label = f"{item.nama_item} - Rp {item.harga:,}"
-        keyboard.append([InlineKeyboardButton(label, callbackdata=f"ppobitem_{item.id}")])
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"ppob_item_{item.id}")])
 
     await sender.reply_text(
         f"📦 PPOB ({kategori})",
@@ -800,10 +800,12 @@ async def import_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Deteksi isi file
     if "•XL" in text or "XL (" in text:
-        await import_xldor(update, context)
-    else:
-        await import_ppob(update, context)    
-  await update.message.reply_text("✅ Data PPOB berhasil diimport dari file.")      
+    await import_xldor(update, context)
+    await update.message.reply_text("✅ File XL Dor berhasil diimport.")
+else:
+    await import_ppob(update, context)
+    await update.message.reply_text("✅ File PPOB berhasil diimport.")
+    
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
@@ -1367,8 +1369,7 @@ def main():
     # ---------- COMMAND ----------
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
-    application.add_handler(MessageHandler(filters.Document.ALL, import_xldor))
-    application.add_handler(MessageHandler(filters.Document.ALL, import_ppob))
+    application.add_handler(MessageHandler(filters.Document.ALL, import_file))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
