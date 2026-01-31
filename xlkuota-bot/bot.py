@@ -1285,43 +1285,35 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"📢 Broadcast terkirim ke {count} member.")
 # ================== HANDLER REGISTRATION ==================
-
 def main():
     migrate_ppob_add_kategori()  # jika kamu pakai migrasi kategori PPOB
 
     application = Application.builder().token(BOT_TOKEN).build()
 
-    # ---------- COMMANDS ----------
+    # ---------- COMMAND ----------
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("approve_topup", approve_topup))
-    application.add_handler(CommandHandler("reject_topup", reject_topup))
-    application.add_handler(CommandHandler("riwayat", riwayat_transaksi))
-    application.add_handler(CommandHandler("broadcast", broadcast))
 
-    # ---------- CALLBACKS ----------
+    # ---------- MESSAGE ----------
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+
+    # ---------- PPOB ----------
     application.add_handler(CallbackQueryHandler(menu_ppob, pattern="^menu_ppob$"))
-    application.add_handler(CallbackQueryHandler(menu_xldor, pattern="^menu_xldor$"))
-
-    # PPOB
     application.add_handler(CallbackQueryHandler(callback_ppob_main, pattern="^ppobcat_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_item, pattern="^ppobitem_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_beli, pattern="^ppobbeli_"))
     application.add_handler(CallbackQueryHandler(callback_ppob_confirm, pattern="^ppobconfirm_"))
 
-    # XL Dor
+    # ---------- XL Dor ----------
     application.add_handler(CallbackQueryHandler(menu_xldor, pattern="^menu_xldor$"))
     application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_beli, pattern="^xldorbeli_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_confirm, pattern="^xldorconfirm_"))
 
-    # Admin approve/reject transaksi
+    # ---------- Admin ----------
     application.add_handler(CallbackQueryHandler(adminapprove, pattern="^adminapprove_"))
     application.add_handler(CallbackQueryHandler(adminreject, pattern="^adminreject_"))
-
-    # ---------- MESSAGE HANDLERS ----------
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     # ---------- RUN BOT ----------
     application.run_polling()
