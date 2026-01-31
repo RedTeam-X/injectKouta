@@ -697,70 +697,6 @@ async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         session.close()
         
-# ================== IMPORT XL DOR ==================
-async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Hanya admin yang boleh import
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("❌ Kamu tidak punya izin.")
-        return
-
-    # Validasi file
-    if not update.message.document:
-        await update.message.reply_text("❌ Kirim file teks XL Paket Data.")
-        return
-
-    # Ambil isi file
-    file = await update.message.document.get_file()
-    content = await file.download_as_bytearray()
-    text = content.decode("utf-8")
-
-    session = SessionLocal()
-    kategori = None
-    nama_item, deskripsi, masa_aktif = None, None, None
-
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-
-        # Deteksi kategori (XTRA DIGITAL, FLEX MAXX, AKRAB)
-        if line.startswith("•XL") or line.startswith("XL ("):
-            kategori = line.replace("•XL", "").replace("XL", "").strip("() ")
-
-        # Deteksi item
-        elif line.startswith("XL") or line.startswith("Xtra"):
-            deskripsi = line
-            nama_item = deskripsi.split(",")[0]
-            masa_aktif_raw = deskripsi.split(",")[-1]
-
-            # Ambil hanya angka dari masa aktif (handle "7Hari" atau "7 Hari")
-            digits = "".join(filter(str.isdigit, masa_aktif_raw))
-            if digits:
-                masa_aktif = int(digits)
-            else:
-                masa_aktif = 0  # default jika tidak ada angka
-
-        # Deteksi harga
-        elif line.startswith("Harga:"):
-            try:
-                harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
-                item = XLDorItem(
-                    nama_item=nama_item,
-                    harga=harga,
-                    deskripsi=deskripsi,
-                    masa_aktif=masa_aktif,
-                    kategori=kategori,
-                    aktif=True
-                )
-                session.add(item)
-            except Exception as e:
-                await update.message.reply_text(f"❌ Gagal menambahkan item: {deskripsi} ({e})")
-
-    # Simpan semua item
-    session.commit()
-    session.close()
-
-    await update.message.reply_text("✅ Data XL Dor berhasil diimport dari file.")
 # ================== TAMPILKAN PPOB ITEMS ==================
 async def tampilkan_ppob_items(sender, kategori):
     session = SessionLocal()
@@ -784,6 +720,100 @@ async def tampilkan_ppob_items(sender, kategori):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     
+# ================== IMPORT XL DOR ==================
+async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    file = await update.message.document.get_file()
+    content = await file.download_as_bytearray()
+    text = content.decode("utf-8")
+
+    session = SessionLocal()
+    kategori = None
+    nama_item, deskripsi, masa_aktif = None, None, None
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        # Deteksi kategori
+        if line.startswith("•XL") or line.startswith("XL ("):
+            kategori = line.replace("•XL", "").replace("XL", "").strip("() ")
+
+        # Deteksi item
+        elif line.startswith("XL") or line.startswith("Xtra"):
+            deskripsi = line
+            nama_item = deskripsi.split(",")[0]
+            masa_aktif_raw = deskripsi.split(",")[-1]
+            digits = "".join(filter(str.isdigit, masa_aktif_raw))
+            masa_aktif = int(digits) if digits else 0
+
+        # Deteksi harga
+        elif line.startswith("Harga:"):
+            try:
+                harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
+                item = XLDorItem(
+                    nama_item=nama_item,
+                    harga=harga,
+                    deskripsi=deskripsi,
+                    masa_aktif=masa_aktif,
+                    kategori=kategori,
+                    aktif=True
+                )
+                session.add(item)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Gagal menambahkan item: {deskripsi} ({e})")
+
+    session.commit()
+    session.close()
+
+
+# ================== IMPORT PPOB ==================
+async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    file = await update.message.document.get_file()
+    content = await file.download_as_bytearray()
+    text = content.decode("utf-8")
+
+    session = SessionLocal()
+    kategori = None
+    nama_item, deskripsi, masa_aktif = None, None, 0
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        # Deteksi kategori PPOB
+        if line.startswith("•"):
+            kategori = line.replace("•", "").strip()
+
+        # Deteksi item
+        elif not line.startswith("Harga:") and kategori:
+            deskripsi = line
+            nama_item = deskripsi.split(",")[0]
+            # coba ambil masa aktif kalau ada angka
+            digits = "".join(filter(str.isdigit, deskripsi))
+            masa_aktif = int(digits) if digits else 0
+
+        # Deteksi harga
+        elif line.startswith("Harga:"):
+            try:
+                harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
+                item = PPOBItem(
+                    nama_item=nama_item,
+                    harga=harga,
+                    deskripsi=deskripsi,
+                    masa_aktif=masa_aktif,
+                    kategori=kategori,
+                    aktif=True
+                )
+                session.add(item)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Gagal menambahkan item: {deskripsi} ({e})")
+
+    session.commit()
+    session.close()
+
+
 # ================== IMPORT FILE (AUTO DETECT) ==================
 async def import_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
@@ -800,11 +830,13 @@ async def import_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Deteksi isi file
     if "•XL" in text or "XL (" in text:
-        await import_xldor(update, context)   # panggil parser XL Dor
+        await import_xldor(update, context)
         await update.message.reply_text("✅ File XL Dor berhasil diimport.")
-    else:
-        await import_ppob(update, context)    # panggil parser PPOB
+    elif "•AXIS" in text or "•Indosat" in text or "•Telkomsel" in text or "•Masa Aktif" in text:
+        await import_ppob(update, context)
         await update.message.reply_text("✅ File PPOB berhasil diimport.")
+    else:
+        await update.message.reply_text("❌ Format file tidak dikenali.")
     
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
