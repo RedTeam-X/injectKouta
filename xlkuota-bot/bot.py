@@ -694,10 +694,6 @@ async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Semua data XL Dor berhasil dihapus.")
     finally:
         session.close()
-async def importxldor(update: Update, context: ContextTypes.DEFAULTTYPE):
-    if update.effectiveuser.id != ADMINCHAT_ID:
-        await update.message.reply_text("❌ Kamu tidak punya izin.")
-        return
     if not update.message.document:
         await update.message.reply_text("❌ Kirim file teks XL Paket Data.")
         return
