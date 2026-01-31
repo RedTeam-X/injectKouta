@@ -800,11 +800,11 @@ async def import_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Deteksi isi file
     if "•XL" in text or "XL (" in text:
-    await import_xldor(update, context)
-    await update.message.reply_text("✅ File XL Dor berhasil diimport.")
-else:
-    await import_ppob(update, context)
-    await update.message.reply_text("✅ File PPOB berhasil diimport.")
+        await import_xldor(update, context)   # panggil parser XL Dor
+        await update.message.reply_text("✅ File XL Dor berhasil diimport.")
+    else:
+        await import_ppob(update, context)    # panggil parser PPOB
+        await update.message.reply_text("✅ File PPOB berhasil diimport.")
     
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
