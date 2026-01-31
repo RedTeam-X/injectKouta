@@ -21,7 +21,7 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN, ADMIN_CHAT_ID, MIN_TOPUP, QRIS_IMAGE_PATH
-from db import SessionLocal, migrate_ppob_add_kategori
+from db import SessionLocal, migrate_ppob_add_kategori, migrate_xldor_add_kategori
 from models import Member, Topup, Report, MessageLog, XLDorItem, PPOBItem, Transaction
 
 
