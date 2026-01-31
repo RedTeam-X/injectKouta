@@ -694,6 +694,42 @@ async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Semua data XL Dor berhasil dihapus.")
     finally:
         session.close()
+async def importxldor(update: Update, context: ContextTypes.DEFAULTTYPE):
+    if update.effectiveuser.id != ADMINCHAT_ID:
+        await update.message.reply_text("❌ Kamu tidak punya izin.")
+        return
+    if not update.message.document:
+        await update.message.reply_text("❌ Kirim file teks XL Paket Data.")
+        return
+
+    file = await update.message.document.get_file()
+    content = await file.downloadasbytearray()
+    text = content.decode("utf-8")
+
+    session = SessionLocal()
+    kategori = None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("•XL"):
+            kategori = line.replace("•XL", "").strip("() ")
+        elif line.startswith("XL"):
+            deskripsi = line
+            nama_item = deskripsi.split(",")[0]
+            masa_aktif = int(deskripsi.split(",")[-1].replace("Hari","").replace(" ", "").strip())
+        elif line.startswith("Harga:"):
+            harga = int(line.replace("Harga: Rp","").replace(".","").strip())
+            item = XLDorItem(
+                namaitem=namaitem,
+                harga=harga,
+                deskripsi=deskripsi,
+                masaaktif=masaaktif,
+                kategori=kategori,
+                aktif=True
+            )
+            session.add(item)
+    session.commit()
+    session.close()
+    await update.message.reply_text("✅ Data XL Dor berhasil diimport dari file.")
     
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1258,6 +1294,7 @@ def main():
     # ---------- COMMAND ----------
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
+    application.add_handler(MessageHandler(filters.Document.ALL, import_xldor))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
