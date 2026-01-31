@@ -1012,29 +1012,14 @@ if text.lower() == "top up saldo":
         )
         return
 
-    if text.lower() == "top up saldo":
-        if not member.verified:
-            await update.message.reply_text("❌ Kamu harus login dulu.")
-            return
-
-        await update.message.reply_text(
-            f"💰 *Top Up Saldo*\nMinimal: Rp{MIN_TOPUP:,}\n\n"
-            "Silakan transfer ke QRIS berikut lalu kirim bukti foto.",
-            parse_mode="Markdown"
-        )
-
-        if os.path.exists(QRIS_IMAGE_PATH):
-            with open(QRIS_IMAGE_PATH, "rb") as f:
-                await context.bot.send_photo(
-                    chat_id=tg_user.id,
-                    photo=f,
-                    caption="🔶 Scan QRIS ini."
-                )
-        else:
-            await update.message.reply_text("⚠️ QRIS tidak ditemukan.")
-
-        context.user_data["topup_mode"] = True
+if text.lower() == "top up saldo":
+    if not member.verified:
+        await update.message.reply_text("❌ Kamu harus login dulu.")
         return
+
+    # panggil alur baru top up
+    await menu_topup(update, context)
+    return
 
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
