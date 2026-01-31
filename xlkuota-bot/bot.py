@@ -682,6 +682,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📲 Silakan pilih menu:",
         reply_markup=main_menu_keyboard()
     )
+async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("❌ Kamu tidak punya izin.")
+        return
+
+    session = SessionLocal()
+    try:
+        session.query(XLDorItem).delete()
+        session.commit()
+        await update.message.reply_text("✅ Semua data XL Dor berhasil dihapus.")
+    finally:
+        session.close()
     
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1245,6 +1257,7 @@ def main():
 
     # ---------- COMMAND ----------
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("clear_xldor", clear_xldor))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
