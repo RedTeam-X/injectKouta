@@ -856,7 +856,7 @@ async def import_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Format file tidak dikenali.")
     
-# ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
+# ================== HANDLE TEXT (FINAL) ==================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -944,14 +944,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-if text.lower() == "top up saldo":
-    if not member.verified:
-        await update.message.reply_text("❌ Kamu harus login dulu.")
-        return
+    if text.lower() == "top up saldo":
+        if not member.verified:
+            await update.message.reply_text("❌ Kamu harus login dulu.")
+            return
 
-    # panggil alur baru top up
-    await menu_topup(update, context)
-    return
+        # 🔧 Alur baru top up
+        await menu_topup(update, context)
+        return
 
     # ---------- DEFAULT ----------
     await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
