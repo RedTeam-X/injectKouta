@@ -72,7 +72,6 @@ class XLDorItem(Base):
     masa_aktif = Column(Integer)  # dalam hari
     kategori = Column(String)     # ← tambahkan ini
     aktif = Column(Boolean, default=True)
-
 # ================== PPOB ITEM ==================
 class PPOBItem(Base):
     __tablename__ = "ppob_items"
