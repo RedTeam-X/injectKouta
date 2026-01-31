@@ -1286,8 +1286,8 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📢 Broadcast terkirim ke {count} member.")
 # ================== HANDLER REGISTRATION ==================
 def main():
-    migrate_ppob_add_kategori()  # jika kamu pakai migrasi kategori PPOB
-
+    migrate_ppob_add_kategori()
+    migrate_xldor_add_kategori()  # ← tambahkan ini
     application = Application.builder().token(BOT_TOKEN).build()
 
     # ---------- COMMAND ----------
