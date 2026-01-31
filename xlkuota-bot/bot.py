@@ -732,8 +732,13 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             deskripsi = line
             nama_item = deskripsi.split(",")[0]
             masa_aktif_raw = deskripsi.split(",")[-1]
+
             # Ambil hanya angka dari masa aktif (handle "7Hari" atau "7 Hari")
-            masa_aktif = int("".join(filter(str.isdigit, masa_aktif_raw)))
+            digits = "".join(filter(str.isdigit, masa_aktif_raw))
+            if digits:
+                masa_aktif = int(digits)
+            else:
+                masa_aktif = 0  # default jika tidak ada angka
 
         # Deteksi harga
         elif line.startswith("Harga:"):
