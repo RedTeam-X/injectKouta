@@ -987,40 +987,6 @@ if text.lower() == "top up saldo":
         context.user_data["state"] = STATE_NONE
         return
 
-    # ---------- MENU TEKS ----------
-    if text.lower() == "xl dor":
-        await menu_xldor(update, context)
-        return
-
-    if text.lower() == "ppob":
-        await menu_ppob(update, context)
-        return
-
-    if text.lower() == "lapor masalah":
-        context.user_data["state"] = STATE_LAPOR_BUG
-        await update.message.reply_text("📝 Silakan tulis laporan kamu.")
-        return
-
-    if text.lower() == "hubungi admin":
-        context.user_data["state"] = STATE_HUBUNGI_ADMIN
-        await update.message.reply_text("✉️ Tulis pesan untuk admin.")
-        return
-
-    if text.lower() == "cek saldo":
-        await update.message.reply_text(
-            f"💵 Saldo kamu: Rp{int(member.saldo):,}"
-        )
-        return
-
-if text.lower() == "top up saldo":
-    if not member.verified:
-        await update.message.reply_text("❌ Kamu harus login dulu.")
-        return
-
-    # panggil alur baru top up
-    await menu_topup(update, context)
-    return
-
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
     total_member = session.query(Member).count()
