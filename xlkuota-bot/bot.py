@@ -1309,6 +1309,7 @@ def main():
     application.add_handler(CallbackQueryHandler(callback_ppob_confirm, pattern="^ppobconfirm_"))
 
     # XL Dor
+    application.add_handler(CallbackQueryHandler(menu_xldor, pattern="^menu_xldor$"))
     application.add_handler(CallbackQueryHandler(callback_xldor_kategori, pattern="^xldorcat_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_item, pattern="^xldoritem_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_beli, pattern="^xldorbeli_"))
