@@ -25,3 +25,16 @@ def migrate_ppob_add_kategori():
                 print("Kolom kategori sudah ada.")
             else:
                 raise
+                
+def migrate_xldor_add_kategori():
+    """Menambahkan kolom kategori ke XL Dor jika belum ada."""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE xldor_items ADD COLUMN kategori VARCHAR"))
+            conn.commit()
+            print("Kolom kategori berhasil ditambahkan.")
+        except ProgrammingError as e:
+            if "already exists" in str(e):
+                print("Kolom kategori sudah ada.")
+            else:
+                raise
