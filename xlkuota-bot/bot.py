@@ -682,6 +682,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📲 Silakan pilih menu:",
         reply_markup=main_menu_keyboard()
     )
+    
+# ================== CLEAR DATABASE XL DOR ==================
 async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("❌ Kamu tidak punya izin.")
@@ -694,37 +696,65 @@ async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Semua data XL Dor berhasil dihapus.")
     finally:
         session.close()
+        
+# ================== IMPORT XL DOR ==================
+async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Hanya admin yang boleh import
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("❌ Kamu tidak punya izin.")
+        return
+
+    # Validasi file
     if not update.message.document:
         await update.message.reply_text("❌ Kirim file teks XL Paket Data.")
         return
 
+    # Ambil isi file
     file = await update.message.document.get_file()
-    content = await file.downloadasbytearray()
+    content = await file.download_as_bytearray()
     text = content.decode("utf-8")
 
     session = SessionLocal()
     kategori = None
+    nama_item, deskripsi, masa_aktif = None, None, None
+
     for line in text.splitlines():
         line = line.strip()
-        if line.startswith("•XL"):
-            kategori = line.replace("•XL", "").strip("() ")
-        elif line.startswith("XL"):
+        if not line:
+            continue
+
+        # Deteksi kategori (XTRA DIGITAL, FLEX MAXX, AKRAB)
+        if line.startswith("•XL") or line.startswith("XL ("):
+            kategori = line.replace("•XL", "").replace("XL", "").strip("() ")
+
+        # Deteksi item
+        elif line.startswith("XL") or line.startswith("Xtra"):
             deskripsi = line
             nama_item = deskripsi.split(",")[0]
-            masa_aktif = int(deskripsi.split(",")[-1].replace("Hari","").replace(" ", "").strip())
+            masa_aktif_raw = deskripsi.split(",")[-1]
+            # Ambil hanya angka dari masa aktif (handle "7Hari" atau "7 Hari")
+            masa_aktif = int("".join(filter(str.isdigit, masa_aktif_raw)))
+
+        # Deteksi harga
         elif line.startswith("Harga:"):
-            harga = int(line.replace("Harga: Rp","").replace(".","").strip())
-            item = XLDorItem(
-                namaitem=namaitem,
-                harga=harga,
-                deskripsi=deskripsi,
-                masaaktif=masaaktif,
-                kategori=kategori,
-                aktif=True
-            )
-            session.add(item)
+            try:
+                harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
+                item = XLDorItem(
+                    nama_item=nama_item,
+                    harga=harga,
+                    deskripsi=deskripsi,
+                    masa_aktif=masa_aktif,
+                    kategori=kategori,
+                    aktif=True
+                )
+                session.add(item)
+            except Exception as e:
+                await update.message.reply_text(f"❌ Gagal menambahkan item: {deskripsi} ({e})")
+
+    # Simpan semua item
     session.commit()
     session.close()
+
     await update.message.reply_text("✅ Data XL Dor berhasil diimport dari file.")
     
 # ================== HANDLE TEXT (VERSI CLEAN & FINAL) ==================
