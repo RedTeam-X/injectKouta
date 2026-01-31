@@ -2,6 +2,7 @@
 import os
 import random
 import datetime
+import uuid
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -1256,98 +1257,125 @@ async def adminreject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         session.close()
 
+# ================== MENU TOP UP ==================
+async def menu_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton("Top Up Sekarang", callback_data="topup_start")]]
+    await update.message.reply_text(
+        f"💰 Minimal Top Up Rp {MIN_TOPUP:,}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
-# ================== ADMIN: APPROVE TOPUP ==================
-async def approve_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
+# ================== PROSES TOP UP ==================
+async def topup_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text("Masukkan nominal Top Up (contoh: 50000):")
+    context.user_data["topup_step"] = "ask_nominal"
+
+async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("topup_step") == "ask_nominal":
+        try:
+            nominal = int(update.message.text)
+            if nominal < MIN_TOPUP:
+                await update.message.reply_text(f"❌ Minimal Top Up Rp {MIN_TOPUP:,}")
+                return
+
+            kode_transaksi = f"TOPUP-{uuid.uuid4().hex[:6].upper()}"
+            user = update.effective_user
+
+            # Simpan transaksi ke DB
+            session = SessionLocal()
+            trx = Topup(
+                user_id=str(user.id),
+                username=user.username or str(user.id),
+                nominal=nominal,
+                kode_transaksi=kode_transaksi,
+                status="pending"
+            )
+            session.add(trx)
+            session.commit()
+            trx_id = trx.id
+            session.close()
+
+            # Kirim tiket ke admin
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=(
+                    f"🔔 Transaksi Top Up Baru\n\n"
+                    f"🧾 ID: {trx_id}\n"
+                    f"👤 Username: @{trx.username}\n"
+                    f"🆔 Telegram ID: {trx.user_id}\n"
+                    f"💰 Nominal: Rp {trx.nominal:,}\n"
+                    f"🔑 Kode Transaksi: {trx.kode_transaksi}\n\n"
+                    f"Pilih aksi:"
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_topup_{trx_id}"),
+                        InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_topup_{trx_id}")
+                    ]
+                ])
+            )
+
+            # Balas ke user
+            await update.message.reply_text(
+                f"✅ Permintaan Top Up Rp {nominal:,} sudah dicatat.\n"
+                f"Tunggu admin mengirim QRIS untuk pembayaran."
+            )
+
+            context.user_data["topup_step"] = None
+
+        except ValueError:
+            await update.message.reply_text("❌ Nominal harus angka.")
+
+# ================== ADMIN: APPROVE TOP UP ==================
+async def adminapprove_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    trx_id = query.data.replace("adminapprove_topup_", "")
 
     session = SessionLocal()
-    args = update.message.text.split()
-
-    if len(args) != 3:
-        await update.message.reply_text("Format: /approve_topup <TRX_CODE> <jumlah>")
+    trx = session.query(Topup).filter_by(id=trx_id, status="pending").first()
+    if not trx:
+        await query.edit_message_text("❌ Transaksi top up tidak ditemukan atau sudah diproses.")
         session.close()
         return
 
-    _, trx_code, amount_str = args
+    member = session.query(Member).filter_by(telegram_id=trx.user_id).first()
+    if member:
+        member.saldo += trx.nominal
+        trx.status = "approved"
+        session.commit()
 
-    try:
-        amount = float(amount_str)
-    except ValueError:
-        await update.message.reply_text("Jumlah tidak valid.")
-        session.close()
-        return
-
-    topup = session.query(Topup).filter_by(trx_code=trx_code).first()
-    if not topup:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        session.close()
-        return
-
-    if topup.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        session.close()
-        return
-
-    member = session.query(Member).filter_by(id=topup.member_id).first()
-    if not member:
-        await update.message.reply_text("Member tidak ditemukan.")
-        session.close()
-        return
-
-    member.saldo += amount
-    member.transaksi += 1
-
-    topup.amount = amount
-    topup.status = "success"
-    topup.verified_at = datetime.datetime.utcnow()
-
-    session.commit()
+        await context.bot.send_message(
+            chat_id=int(trx.user_id),
+            text=f"✅ Top Up Rp{trx.nominal:,} berhasil! Saldo kamu sekarang Rp{member.saldo:,}."
+        )
+        await query.edit_message_text(f"✔️ Transaksi Top Up {trx.kode_transaksi} sudah di-approve.")
     session.close()
 
-    await update.message.reply_text(
-        f"✅ Top-up {trx_code} sebesar Rp{int(amount):,} berhasil diverifikasi."
-    )
+# ================== ADMIN: REJECT TOP UP ==================
+async def adminreject_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    trx_id = query.data.replace("adminreject_topup_", "")
+
+    session = SessionLocal()
+    trx = session.query(Topup).filter_by(id=trx_id, status="pending").first()
+    if not trx:
+        await query.edit_message_text("❌ Transaksi top up tidak ditemukan atau sudah diproses.")
+        session.close()
+        return
+
+    trx.status = "rejected"
+    session.commit()
 
     await context.bot.send_message(
-        chat_id=int(member.telegram_id),
-        text=f"🎉 Top-up Rp{int(amount):,} berhasil! Saldo kamu sekarang Rp{int(member.saldo):,}"
+        chat_id=int(trx.user_id),
+        text=f"❌ Top Up Rp{trx.nominal:,} ditolak oleh admin."
     )
-
-
-# ================== ADMIN: REJECT TOPUP ==================
-async def reject_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    session = SessionLocal()
-    args = update.message.text.split()
-
-    if len(args) != 2:
-        await update.message.reply_text("Format: /reject_topup <TRX_CODE>")
-        session.close()
-        return
-
-    _, trx_code = args
-
-    topup = session.query(Topup).filter_by(trx_code=trx_code).first()
-    if not topup:
-        await update.message.reply_text("ID transaksi tidak ditemukan.")
-        session.close()
-        return
-
-    if topup.status != "pending":
-        await update.message.reply_text("Transaksi sudah diproses.")
-        session.close()
-        return
-
-    topup.status = "gagal"
-    topup.verified_at = datetime.datetime.utcnow()
-    session.commit()
+    await query.edit_message_text(f"❌ Transaksi Top Up {trx.kode_transaksi} sudah ditolak.")
     session.close()
-
-    await update.message.reply_text(f"❌ Top-up {trx_code} ditolak admin.")
 
 
 # ================== ADMIN: RIWAYAT TRANSAKSI ==================
