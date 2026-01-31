@@ -773,7 +773,9 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.close()
 
 
-# ================== IMPORT PPOB (SKIP DUPLIKAT + SUPPORT TELKOMSEL) ==================
+import re
+
+# ================== IMPORT PPOB (FINAL) ==================
 async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await update.message.document.get_file()
     content = await file.download_as_bytearray()
@@ -796,9 +798,10 @@ async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif not line.startswith("Harga:") and kategori:
             deskripsi = line
             nama_item = deskripsi.strip()
-            # coba ambil masa aktif kalau ada angka
-            digits = "".join(filter(str.isdigit, deskripsi))
-            masa_aktif = int(digits) if digits else 0
+
+            # Ambil masa aktif hanya dari pola "xx Hari"
+            match = re.search(r"(\d+)\s*Hari", deskripsi)
+            masa_aktif = int(match.group(1)) if match else 0
 
         # Deteksi harga
         elif line.startswith("Harga:"):
@@ -825,6 +828,7 @@ async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     session.commit()
     session.close()
+    await update.message.reply_text("✅ Import PPOB selesai.")
 
 
 # ================== IMPORT FILE (AUTO DETECT) ==================
