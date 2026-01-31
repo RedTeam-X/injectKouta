@@ -70,6 +70,7 @@ class XLDorItem(Base):
     harga = Column(Float)
     deskripsi = Column(String)
     masa_aktif = Column(Integer)  # dalam hari
+    kategori = Column(String)     # ← tambahkan ini
     aktif = Column(Boolean, default=True)
 
 # ================== PPOB ITEM ==================
