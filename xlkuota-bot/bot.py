@@ -735,12 +735,12 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not line:
             continue
 
-        # Deteksi kategori
+        # Deteksi kategori XL Dor
         if line.startswith("•XL") or line.startswith("XL ("):
             kategori = line.replace("•XL", "").replace("XL", "").strip("() ")
 
         # Deteksi item
-        elif line.startswith("XL") or line.startswith("Xtra"):
+        elif not line.startswith("Harga:") and kategori:
             deskripsi = line
             nama_item = deskripsi.split(",")[0]
             masa_aktif_raw = deskripsi.split(",")[-1]
@@ -751,7 +751,13 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif line.startswith("Harga:"):
             try:
                 harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
-                item = XLDorItem(
+
+                # cek duplikat
+                existing = session.query(XLDorItem).filter_by(nama_item=nama_item).first()
+                if existing:
+                    continue  # skip duplikat
+
+                new_item = XLDorItem(
                     nama_item=nama_item,
                     harga=harga,
                     deskripsi=deskripsi,
@@ -759,7 +765,7 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     kategori=kategori,
                     aktif=True
                 )
-                session.add(item)
+                session.add(new_item)
             except Exception as e:
                 await update.message.reply_text(f"❌ Gagal menambahkan item: {deskripsi} ({e})")
 
@@ -767,7 +773,7 @@ async def import_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session.close()
 
 
-# ================== IMPORT PPOB ==================
+# ================== IMPORT PPOB (SKIP DUPLIKAT + SUPPORT TELKOMSEL) ==================
 async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await update.message.document.get_file()
     content = await file.download_as_bytearray()
@@ -786,10 +792,10 @@ async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if line.startswith("•"):
             kategori = line.replace("•", "").strip()
 
-        # Deteksi item
+        # Deteksi item (ambil full deskripsi sebagai nama_item)
         elif not line.startswith("Harga:") and kategori:
             deskripsi = line
-            nama_item = deskripsi.split(",")[0]
+            nama_item = deskripsi.strip()
             # coba ambil masa aktif kalau ada angka
             digits = "".join(filter(str.isdigit, deskripsi))
             masa_aktif = int(digits) if digits else 0
@@ -798,7 +804,13 @@ async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif line.startswith("Harga:"):
             try:
                 harga = int(line.replace("Harga: Rp", "").replace(".", "").strip())
-                item = PPOBItem(
+
+                # cek duplikat
+                existing = session.query(PPOBItem).filter_by(nama_item=nama_item).first()
+                if existing:
+                    continue  # skip duplikat
+
+                new_item = PPOBItem(
                     nama_item=nama_item,
                     harga=harga,
                     deskripsi=deskripsi,
@@ -806,7 +818,8 @@ async def import_ppob(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     kategori=kategori,
                     aktif=True
                 )
-                session.add(item)
+                session.add(new_item)
+
             except Exception as e:
                 await update.message.reply_text(f"❌ Gagal menambahkan item: {deskripsi} ({e})")
 
