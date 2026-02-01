@@ -1402,12 +1402,19 @@ def main():
     application.add_handler(CallbackQueryHandler(callback_xldor_beli, pattern="^xldorbeli_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_confirm, pattern="^xldorconfirm_"))
 
-    # ---------- Admin ----------
-    application.add_handler(CallbackQueryHandler(adminapprove, pattern="^adminapprove_"))
-    application.add_handler(CallbackQueryHandler(adminreject, pattern="^adminreject_"))
+    # ---------- TOP UP ----------
     application.add_handler(CallbackQueryHandler(topup_start, pattern="^topup_start$"))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_nominal))
-    # ---------- RUN BOT ----------
+    application.addhandler(MessageHandler(filters.TEXT & ~filters.COMMAND, handletopup_nominal))
+    
+    # --- ADMIN: Approve/Reject Top Up ---
+    application.addhandler(CallbackQueryHandler(adminapprovetopup, pattern="^adminapprovetopup"))
+    application.addhandler(CallbackQueryHandler(adminrejecttopup, pattern="^adminrejecttopup"))
+
+    # --- ADMIN: Approve/Reject PPOB/XL Dor ---
+    application.addhandler(CallbackQueryHandler(adminapprove, pattern="^adminapprove"))
+    application.addhandler(CallbackQueryHandler(adminreject, pattern="^adminreject"))
+    
+    
     application.run_polling()
 
 
