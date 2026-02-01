@@ -552,44 +552,6 @@ async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_
         parse_mode="Markdown",
     )
 
-
-# ================== XL DOR: ITEM DETAIL ==================
-async def callback_xldor_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    item_id = query.data.replace("xldoritem_", "")
-
-    session = SessionLocal()
-    try:
-        item = session.query(XLDorItem).filter_by(id=item_id, aktif=True).first()
-    finally:
-        session.close()
-
-    if not item:
-        await query.edit_message_text("❌ Item XL Dor tidak ditemukan.")
-        return
-
-    text = (
-        f"📦 *{item.nama_item}*\n"
-        f"💰 Harga: Rp{int(item.harga):,}\n"
-        f"📝 {item.deskripsi}\n"
-        f"⏳ Masa Aktif: {item.masa_aktif} Hari\n"
-        f"📂 Kategori: {item.kategori}\n"
-    )
-
-    keyboard = [
-        [InlineKeyboardButton("🛒 Beli Sekarang", callback_data=f"xldorbeli_{item.id}")],
-        [InlineKeyboardButton("⬅️ Kembali", callback_data=f"xldorcat_{item.kategori}")],
-    ]
-
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown",
-    )
-
-
 # ================== XL DOR: BELI → INPUT NOMOR ==================
 async def callback_xldor_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -853,6 +815,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---------- LOGIN ----------
     if text.lower() == "login":
         await handle_login(update, context, member, session)
+        session.close()
         return
 
     # ---------- VALIDASI OTP ----------
@@ -871,11 +834,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 reply_markup=main_menu_keyboard()
             )
+        session.close()
         return
 
     # ---------- STATE: INPUT NOMOR XL DOR ----------
     if state == STATE_INPUT_NOMOR_XLDOR:
         await proses_xldor_nomor(update, context)
+        session.close()
         return
 
     # ---------- STATE: LAPOR BUG ----------
@@ -884,9 +849,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         report = Report(user_id=user_id, pesan=text, tag=tag)
         session.add(report)
         session.commit()
-
         await update.message.reply_text("📩 Laporan kamu sudah dikirim ke admin.")
         context.user_data["state"] = STATE_NONE
+        session.close()
         return
 
     # ---------- STATE: HUBUNGI ADMIN ----------
@@ -897,75 +862,51 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text("📩 Pesan kamu sudah dikirim ke admin.")
         context.user_data["state"] = STATE_NONE
+        session.close()
         return
 
     # ---------- MENU TEKS ----------
     if text.lower() == "xl dor":
         await menu_xldor(update, context)
+        session.close()
         return
 
     if text.lower() == "ppob":
         await menu_ppob(update, context)
+        session.close()
         return
 
     if text.lower() == "lapor masalah":
         context.user_data["state"] = STATE_LAPOR_BUG
         await update.message.reply_text("📝 Silakan tulis laporan kamu.")
+        session.close()
         return
 
     if text.lower() == "hubungi admin":
         context.user_data["state"] = STATE_HUBUNGI_ADMIN
         await update.message.reply_text("✉️ Tulis pesan untuk admin.")
+        session.close()
         return
 
     if text.lower() == "cek saldo":
-        await update.message.reply_text(
-            f"💵 Saldo kamu: Rp{int(member.saldo):,}"
-        )
+        await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
+        session.close()
         return
 
     if text.lower() == "top up saldo":
         if not member.verified:
             await update.message.reply_text("❌ Kamu harus login dulu.")
+            session.close()
             return
 
         # 🔧 Alur baru top up
-        await menu_topup(update, context)
+        await menu_topup(update, context)   # pastikan fungsi ini ada
+        session.close()
         return
 
     # ---------- DEFAULT ----------
     await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
     session.close()
-    # ---------- STATE: INPUT NOMOR XL DOR ----------
-    if state == STATE_INPUT_NOMOR_XLDOR:
-        await proses_xldor_nomor(update, context)
-        return
-
-    # ---------- STATE: LAPOR BUG ----------
-    if state == STATE_LAPOR_BUG:
-        tag = auto_tag_report(text)
-
-        report = Report(
-            user_id=user_id,
-            pesan=text,
-            tag=tag
-        )
-        session.add(report)
-        session.commit()
-
-        await update.message.reply_text("📩 Laporan kamu sudah dikirim ke admin.")
-        context.user_data["state"] = STATE_NONE
-        return
-
-    # ---------- STATE: HUBUNGI ADMIN ----------
-    if state == STATE_HUBUNGI_ADMIN:
-        await context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID,
-            text=f"📨 Pesan dari user {tg_user.full_name}:\n\n{text}"
-        )
-        await update.message.reply_text("📩 Pesan kamu sudah dikirim ke admin.")
-        context.user_data["state"] = STATE_NONE
-        return
 
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
