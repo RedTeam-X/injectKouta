@@ -479,55 +479,35 @@ async def callback_xldor_confirm(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
-    item_id = query.data.replace("xldorconfirm_", "")
+    trx_id = query.data.replace("xldorconfirm_", "")
 
     session = SessionLocal()
     try:
-        item = session.query(XLDorItem).filter_by(id=item_id, aktif=True).first()
-        if not item:
-            await query.edit_message_text("❌ Item XL Dor tidak ditemukan.")
+        trx = session.query(Transaction).filter_by(id=trx_id).first()
+        if not trx:
+            await query.edit_message_text("❌ Transaksi tidak ditemukan.")
             return
 
-        user = query.from_user
+        # Ambil item dari DB
+        item = session.query(XLDorItem).filter_by(id=trx.item_id).first()
+        if not item:
+            await query.edit_message_text("❌ Item tidak ditemukan.")
+            return
 
-        trx = Transaction(
-            user_id=str(user.id),
-            jenis="XLDOR",
-            item_nama=item.nama_item,
-            item_id=item.id,
-            harga=item.harga,
-            status="pending",
-        )
-        session.add(trx)
-        session.commit()
-        trx_id = trx.id
+        # Simpan field ke variabel sebelum session ditutup
+        item_nama = item.nama_item
+        item_harga = item.harga
+
     finally:
         session.close()
 
-    await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=(
-            f"📩 *Tiket Pembelian XL Dor*\n\n"
-            f"🧾 ID: {trx_id}\n"
-            f"👤 User: {user.full_name} (ID: {user.id})\n"
-            f"📦 Item: {item.nama_item}\n"
-            f"💰 Harga: Rp{int(item.harga):,}\n\n"
-            f"Pilih aksi:"
-        ),
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_{trx_id}"),
-                    InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_{trx_id}"),
-                ]
-            ]
-        ),
-        parse_mode="Markdown",
-    )
-
+    # Gunakan variabel, bukan objek item
     await query.edit_message_text(
-        "🎉 Permintaan pembelian XL Dor sudah dikirim ke admin.\nStatus: *pending*.",
-        parse_mode="Markdown",
+        f"🛒 Konfirmasi Pembelian XL Dor\n"
+        f"📱 Nomor: {trx.keterangan}\n"
+        f"📦 Item: {item_nama}\n"
+        f"💰 Harga: Rp{item_harga:,}\n\n"
+        "Jika setuju, admin akan memproses pembelian."
     )
 
 
