@@ -1,8 +1,9 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import ProgrammingError
 import os
+
+from models import Base  # gunakan Base dari models.py
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -10,8 +11,8 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
-
+# Buat semua tabel sesuai models.py
+Base.metadata.create_all(bind=engine)
 
 def migrate_ppob_add_kategori():
     """Menambahkan kolom kategori jika belum ada."""
@@ -25,7 +26,7 @@ def migrate_ppob_add_kategori():
                 print("Kolom kategori sudah ada.")
             else:
                 raise
-                
+
 def migrate_xldor_add_kategori():
     """Menambahkan kolom kategori ke XL Dor jika belum ada."""
     with engine.connect() as conn:
