@@ -1404,19 +1404,17 @@ def main():
 
     # ---------- TOP UP ----------
     application.add_handler(CallbackQueryHandler(topup_start, pattern="^topup_start$"))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handletopup_nominal))
-    
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_nominal))
+
     # --- ADMIN: Approve/Reject Top Up ---
-    application.add_handler(CallbackQueryHandler(adminapprovetopup, pattern="^adminapprovetopup"))
-    application.add_handler(CallbackQueryHandler(adminrejecttopup, pattern="^adminrejecttopup"))
+    application.add_handler(CallbackQueryHandler(adminapprove_topup, pattern="^adminapprove_topup_"))
+    application.add_handler(CallbackQueryHandler(adminreject_topup, pattern="^adminreject_topup_"))
 
     # --- ADMIN: Approve/Reject PPOB/XL Dor ---
-    application.add_handler(CallbackQueryHandler(adminapprove, pattern="^adminapprove"))
-    application.add_handler(CallbackQueryHandler(adminreject, pattern="^adminreject"))
-    
-    
-    application.run_polling()
+    application.add_handler(CallbackQueryHandler(adminapprove, pattern="^adminapprove_"))
+    application.add_handler(CallbackQueryHandler(adminreject, pattern="^adminreject_"))
 
+    application.run_polling()
 
 # ================== JALANKAN BOT ==================
 if __name__ == "__main__":
