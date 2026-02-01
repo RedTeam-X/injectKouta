@@ -1405,7 +1405,8 @@ def main():
     # ---------- Admin ----------
     application.add_handler(CallbackQueryHandler(adminapprove, pattern="^adminapprove_"))
     application.add_handler(CallbackQueryHandler(adminreject, pattern="^adminreject_"))
-
+    application.add_handler(CallbackQueryHandler(topup_start, pattern="^topup_start$"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_nominal))
     # ---------- RUN BOT ----------
     application.run_polling()
 
