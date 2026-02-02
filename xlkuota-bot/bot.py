@@ -1095,8 +1095,8 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
     trx_id = topup.id
     session.close()
 
-  # ====== KIRIM TIKET KE ADMIN ======
-  await context.bot.send_message(
+# ====== KIRIM TIKET KE ADMIN ======
+await context.bot.send_message(
     chat_id=ADMIN_CHAT_ID,
     text=(
         f"📩 *Tiket Pembelian XL Dor*\n\n"
@@ -1116,13 +1116,20 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
     parse_mode="Markdown"
 )
 
-    # Balas ke user
-    await update.message.reply_text(
-        f"✅ Permintaan Top Up Rp {amount:,} sudah dicatat.\n"
-        f"Tunggu admin memverifikasi pembayaran."
-    )
+# ====== BALAS KE USER (XL DOR, BUKAN TOP UP) ======
+await update.message.reply_text(
+    (
+        "📦 *Permintaan XL Dor diterima*\n\n"
+        f"📱 Nomor: {trx.keterangan}\n"
+        f"📦 Paket: {trx.item_nama}\n"
+        f"💰 Harga: Rp{trx.harga:,}\n\n"
+        "⏳ Status: *Menunggu admin memproses*"
+    ),
+    parse_mode="Markdown"
+)
 
-    context.user_data["topup_mode"] = False
+# bersihkan state input nomor
+context.user_data["state"] = STATE_NONE
 
 # ================== ADMIN: APPROVE TOP UP ==================
 async def adminapprove_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
