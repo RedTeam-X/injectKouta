@@ -1320,9 +1320,6 @@ def main():
     application.add_handler(CallbackQueryHandler(callback_xldor_beli, pattern="^xldorbeli_"))
     application.add_handler(CallbackQueryHandler(callback_xldor_confirm, pattern="^xldorconfirm_"))
 
-    # ---------- TOP UP ----------
-    application.add_handler(CallbackQueryHandler(topup_start, pattern="^topup_start$"))
-
     # --- ADMIN: Approve/Reject Top Up ---
     application.add_handler(CallbackQueryHandler(adminapprove_topup, pattern="^adminapprove_topup_"))
     application.add_handler(CallbackQueryHandler(adminreject_topup, pattern="^adminreject_topup_"))
@@ -1331,10 +1328,13 @@ def main():
     application.add_handler(CallbackQueryHandler(adminapprove, pattern="^adminapprove_"))
     application.add_handler(CallbackQueryHandler(adminreject, pattern="^adminreject_"))
 
-    application.run_polling(drop_pending_updates=True)
-    # ---------- MESSAGE ----------
+    # ---------- HANDLER ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
-# ================== JALANKAN BOT ==================
+    # ---------- JALANKAN BOT ----------
+    application.run_polling(drop_pending_updates=True)
+
+
+# ================== ENTRY POINT ==================
 if __name__ == "__main__":
     main()
