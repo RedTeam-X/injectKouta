@@ -1,4 +1,5 @@
 # ================== IMPORTS ==================
+import time
 import logging
 
 logging.basicConfig(
@@ -727,21 +728,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text.strip()
     tg_user = update.effective_user
-    user_id = str(tg_user.id)
 
     session = SessionLocal()
     member = get_or_create_member(session, tg_user)
-
     state = context.user_data.get("state", STATE_NONE)
 
-    # ---------- LOGIN ----------
+# ---------- LOGIN ----------
     if text.lower() == "login":
         await handle_login(update, context, member, session)
         session.close()
         return
 
-    # ---------- VALIDASI OTP ----------
-    if not member.verified:
+    # ---------- VALIDASI OTP (HANYA JIKA SEDANG OTP) ----------
+    if context.user_data.get("state") == "OTP":
         success = await validate_otp(update, context, member, session)
         if success:
             total_member = session.query(Member).count()
@@ -756,33 +755,43 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 reply_markup=main_menu_keyboard()
             )
+            context.user_data["state"] = STATE_NONE
         session.close()
         return
 
 # ---------- STATE: INPUT NOMOR XL DOR ----------
     if state == STATE_INPUT_NOMOR_XLDOR:
         await proses_xldor_nomor(update, context)
+        # pastikan state dibersihkan di sini
+        context.user_data["state"] = STATE_NONE
         session.close()
         return
 
     # ---------- STATE: LAPOR BUG ----------
     if state == STATE_LAPOR_BUG:
-        tag = auto_tag_report(text)
+        try:
+            tag = auto_tag_report(text)
 
-        report = Report(
-            member_id=member.id,
-            category=tag,
-            message=text
-        )
-        session.add(report)
-        session.commit()
+            report = Report(
+                member_id=member.id,
+                category=tag,
+                message=text
+            )
+            session.add(report)
+            session.commit()
 
-        await update.message.reply_text("📩 Laporan kamu sudah dikirim ke admin.")
-        context.user_data["state"] = STATE_NONE
-        session.close()
+            await update.message.reply_text("📩 Laporan kamu sudah dikirim ke admin.")
+        except Exception:
+            session.rollback()
+            await update.message.reply_text(
+                "❌ Gagal mengirim laporan. Silakan coba lagi."
+            )
+        finally:
+            context.user_data["state"] = STATE_NONE
+            session.close()
         return
 
-    # ---------- STATE: HUBUNGI ADMIN ----------
+# ---------- STATE: HUBUNGI ADMIN ----------
     if state == STATE_HUBUNGI_ADMIN:
         await context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
@@ -792,9 +801,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = STATE_NONE
         session.close()
         return
-# ---------- TOP UP: INPUT NOMINAL ----------
-    if context.user_data.get("topup_mode"):
-        nominal_text = text.replace("Rp", "").replace(".", "").replace(",", "").strip()
+
+    # ---------- TOP UP: INPUT NOMINAL ----------
+    if state == STATE_NONE and context.user_data.get("topup_mode"):
+        nominal_text = (
+            text.replace("Rp", "")
+            .replace(".", "")
+            .replace(",", "")
+            .strip()
+        )
 
         if not nominal_text.isdigit():
             await update.message.reply_text(
@@ -812,43 +827,66 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             session.close()
             return
 
-        # ====== BUAT DATA TOP UP ======
-        topup = Topup(
-            member_id=member.id,
-            trx_code=f"TOPUP-{int(time.time())}",
-            amount=nominal,
-            status="pending"
+   # ====== CEK DUPLIKAT TOP UP ======
+        existing = (
+            session.query(Topup)
+            .filter_by(member_id=member.id, status="pending")
+            .first()
         )
-        session.add(topup)
-        session.commit()
-
-        # ====== KIRIM TIKET KE ADMIN ======
-        await context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID,
-            text=(
-                f"📩 *Tiket Top Up Baru*\n\n"
-                f"🧾 Kode: {topup.trx_code}\n"
-                f"👤 User: {member.username or member.telegram_id}\n"
-                f"🆔 User ID: {member.telegram_id}\n"
-                f"💰 Nominal: Rp{nominal:,}\n"
-                f"📌 Status: pending\n\n"
-                f"Gunakan perintah:\n"
-                f"`/addsaldo {member.telegram_id} {nominal}`"
-            ),
-            parse_mode="Markdown"
-        )
-
-        await update.message.reply_text(
-            (
-                "✅ Permintaan Top Up diterima.\n\n"
-                f"💰 Nominal: Rp{nominal:,}\n"
-                "⏳ Menunggu admin memproses saldo."
+        if existing:
+            await update.message.reply_text(
+                "⏳ Kamu masih memiliki permintaan Top Up yang belum diproses admin."
             )
-        )
+            session.close()
+            return
 
-        context.user_data["topup_mode"] = False
-        session.close()
-        return  
+        try:
+            # ====== BUAT DATA TOP UP ======
+            trx_code = f"TOPUP-{int(time.time())}"
+
+            topup = Topup(
+                member_id=member.id,
+                trx_code=trx_code,
+                amount=nominal,
+                status="pending"
+            )
+            session.add(topup)
+            session.commit()
+
+            # ====== KIRIM TIKET KE ADMIN ======
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=(
+                    f"📩 *Tiket Top Up Baru*\n\n"
+                    f"🧾 Kode: {trx_code}\n"
+                    f"👤 User: {member.username or member.telegram_id}\n"
+                    f"🆔 User ID: {member.telegram_id}\n"
+                    f"💰 Nominal: Rp{nominal:,}\n"
+                    f"📌 Status: pending\n\n"
+                    f"Gunakan perintah:\n"
+                    f"`/addsaldo {member.telegram_id} {nominal}`"
+                ),
+                parse_mode="Markdown"
+            )
+
+            await update.message.reply_text(
+                (
+                    "✅ Permintaan Top Up diterima.\n\n"
+                    f"💰 Nominal: Rp{nominal:,}\n"
+                    "⏳ Menunggu admin memproses saldo."
+                )
+            )
+
+            context.user_data["topup_mode"] = False
+
+        except Exception:
+            session.rollback()
+            await update.message.reply_text(
+                "❌ Terjadi kesalahan saat memproses Top Up. Silakan coba lagi."
+            )
+        finally:
+            session.close()
+        return
         
 # ================== ADMIN: TAMBAH SALDO ==================
 async def admin_addsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -963,29 +1001,36 @@ async def admin_addsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 # ---------- MENU TEKS ----------
     if text.lower() == "xl dor":
+        context.user_data.pop("topup_mode", None)
         await menu_xldor(update, context)
         session.close()
         return
 
     if text.lower() == "ppob":
+        context.user_data.pop("topup_mode", None)
         await menu_ppob(update, context)
         session.close()
         return
 
     if text.lower() == "lapor masalah":
+        context.user_data.pop("topup_mode", None)
         context.user_data["state"] = STATE_LAPOR_BUG
         await update.message.reply_text("📝 Silakan tulis laporan kamu.")
         session.close()
         return
 
     if text.lower() == "hubungi admin":
+        context.user_data.pop("topup_mode", None)
         context.user_data["state"] = STATE_HUBUNGI_ADMIN
         await update.message.reply_text("✉️ Tulis pesan untuk admin.")
         session.close()
         return
 
     if text.lower() == "cek saldo":
-        await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
+        context.user_data.pop("topup_mode", None)
+        await update.message.reply_text(
+            f"💵 Saldo kamu: Rp{int(member.saldo):,}"
+        )
         session.close()
         return
 
@@ -996,8 +1041,12 @@ async def admin_addsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         session.close()
         return
-# ---------- DEFAULT ----------
-    await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
+
+    # ---------- DEFAULT ----------
+    context.user_data.pop("topup_mode", None)
+    await update.message.reply_text(
+        "❓ Perintah tidak dikenali. Silakan pilih menu."
+    )
     session.close()
     return
     # ---------- LOGIN ----------
@@ -1031,17 +1080,18 @@ async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, membe
 
     await update.message.reply_text("📩 OTP dikirim ke DM.")
 
-    # ---------- OTP VALIDASI ----------
-async def validate_otp(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
-    text = update.message.text.strip()
-
-    # OTP harus angka
-    if not text.isdigit():
-        return False
-
-    # Tidak ada OTP tersimpan
-    if not member.otp:
-        return False
+# ---------- VALIDASI OTP ----------
+if context.user_data.get("awaiting_otp"):
+    success = await validate_otp(update, context, member, session)
+    if success:
+        context.user_data["awaiting_otp"] = False
+        total_member = session.query(Member).count()
+        await update.message.reply_text(
+            "✅ Login berhasil!",
+            reply_markup=main_menu_keyboard()
+        )
+    session.close()
+    return
 
     # OTP cocok
     if member.otp == text:
