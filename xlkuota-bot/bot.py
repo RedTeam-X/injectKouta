@@ -732,7 +732,98 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = SessionLocal()
     member = get_or_create_member(session, tg_user)
     state = context.user_data.get("state", STATE_NONE)
+    
+# ================== ADMIN: TAMBAH SALDO ==================
+async def admin_addsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        return
 
+    try:
+        user_id = context.args[0]
+        nominal = int(context.args[1])
+    except:
+        await update.message.reply_text(
+            "❌ Format salah.\nGunakan:\n/addsaldo <user_id> <nominal>"
+        )
+        return
+
+    session = SessionLocal()
+    try:
+        member = session.query(Member).filter_by(telegram_id=user_id).first()
+        if not member:
+            await update.message.reply_text("❌ User tidak ditemukan.")
+            return
+
+        member.saldo += nominal
+
+        topup = (
+            session.query(Topup)
+            .filter_by(member_id=member.id, amount=nominal, status="pending")
+            .order_by(Topup.id.desc())
+            .first()
+        )
+
+        if topup:
+            topup.status = "approved"
+
+        session.commit()
+
+        await update.message.reply_text(
+            f"✅ Saldo user {user_id} berhasil ditambah Rp{nominal:,}."
+        )
+
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=(
+                "🎉 *Top Up Berhasil!*\n\n"
+                f"💰 Saldo bertambah: Rp{nominal:,}\n"
+                f"💳 Saldo sekarang: Rp{int(member.saldo):,}"
+            ),
+            parse_mode="Markdown"
+        )
+
+    finally:
+        session.close()        
+# ================== ADMIN: APPROVE TRANSAKSI (PPOB & XL DOR) ==================
+async def adminapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Hanya admin
+    if query.from_user.id != ADMIN_CHAT_ID:
+        return
+
+    trx_id = query.data.replace("adminapprove_", "")
+
+    session = SessionLocal()
+    try:
+        trx = session.query(Transaction).filter_by(id=trx_id).first()
+
+        if not trx or trx.status != "pending":
+            await query.edit_message_text("❌ Transaksi tidak ditemukan / bukan pending.")
+            return
+
+        trx.status = "success"
+        trx.keterangan = "Disetujui admin"
+        session.commit()
+
+        # Beri tahu user
+        await context.bot.send_message(
+            chat_id=int(trx.user_id),
+            text=(
+                f"🎉 Transaksi {trx.jenis} *{trx.item_nama}* berhasil diproses!\n"
+                f"Status: Sukses."
+            ),
+            parse_mode="Markdown"
+        )
+
+        # Balas admin
+        await query.edit_message_text(f"✅ Transaksi {trx_id} berhasil di-approve.")
+
+    finally:
+        session
+        .close()       
+        
 # ---------- LOGIN ----------
     if text.lower() == "login":
         await handle_login(update, context, member, session)
@@ -887,59 +978,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         finally:
             session.close()
         return
-        
-# ================== ADMIN: TAMBAH SALDO ==================
-async def admin_addsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return
-
-    try:
-        user_id = context.args[0]
-        nominal = int(context.args[1])
-    except:
-        await update.message.reply_text(
-            "❌ Format salah.\nGunakan:\n/addsaldo <user_id> <nominal>"
-        )
-        return
-
-    session = SessionLocal()
-    try:
-        member = session.query(Member).filter_by(telegram_id=user_id).first()
-        if not member:
-            await update.message.reply_text("❌ User tidak ditemukan.")
-            return
-
-        member.saldo += nominal
-
-        topup = (
-            session.query(Topup)
-            .filter_by(member_id=member.id, amount=nominal, status="pending")
-            .order_by(Topup.id.desc())
-            .first()
-        )
-
-        if topup:
-            topup.status = "approved"
-
-        session.commit()
-
-        await update.message.reply_text(
-            f"✅ Saldo user {user_id} berhasil ditambah Rp{nominal:,}."
-        )
-
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=(
-                "🎉 *Top Up Berhasil!*\n\n"
-                f"💰 Saldo bertambah: Rp{nominal:,}\n"
-                f"💳 Saldo sekarang: Rp{int(member.saldo):,}"
-            ),
-            parse_mode="Markdown"
-        )
-
-    finally:
-        session.close()        
-
+    
     # ---------- STATE: INPUT NOMOR PPOB ----------
     if state == STATE_PPOB_NUMBER:
         nomor = text.strip()
@@ -1109,46 +1148,6 @@ async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, membe
         parse_mode="Markdown"
     )
     return False
-
-# ================== ADMIN: APPROVE TRANSAKSI (PPOB & XL DOR) ==================
-async def adminapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    # Hanya admin
-    if query.from_user.id != ADMIN_CHAT_ID:
-        return
-
-    trx_id = query.data.replace("adminapprove_", "")
-
-    session = SessionLocal()
-    try:
-        trx = session.query(Transaction).filter_by(id=trx_id).first()
-
-        if not trx or trx.status != "pending":
-            await query.edit_message_text("❌ Transaksi tidak ditemukan / bukan pending.")
-            return
-
-        trx.status = "success"
-        trx.keterangan = "Disetujui admin"
-        session.commit()
-
-        # Beri tahu user
-        await context.bot.send_message(
-            chat_id=int(trx.user_id),
-            text=(
-                f"🎉 Transaksi {trx.jenis} *{trx.item_nama}* berhasil diproses!\n"
-                f"Status: Sukses."
-            ),
-            parse_mode="Markdown"
-        )
-
-        # Balas admin
-        await query.edit_message_text(f"✅ Transaksi {trx_id} berhasil di-approve.")
-
-    finally:
-        session.close()
-
 
 # ================== ADMIN: REJECT TRANSAKSI (PPOB & XL DOR) ==================
 async def adminreject(update: Update, context: ContextTypes.DEFAULT_TYPE):
