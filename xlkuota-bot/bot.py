@@ -1080,19 +1080,6 @@ async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, membe
 
     await update.message.reply_text("📩 OTP dikirim ke DM.")
 
-# ---------- VALIDASI OTP ----------
-if context.user_data.get("awaiting_otp"):
-    success = await validate_otp(update, context, member, session)
-    if success:
-        context.user_data["awaiting_otp"] = False
-        total_member = session.query(Member).count()
-        await update.message.reply_text(
-            "✅ Login berhasil!",
-            reply_markup=main_menu_keyboard()
-        )
-    session.close()
-    return
-
     # OTP cocok
     if member.otp == text:
         now = datetime.datetime.utcnow()
