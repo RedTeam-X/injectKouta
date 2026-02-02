@@ -1187,21 +1187,6 @@ await update.message.reply_text(
 # bersihkan state input nomor
 context.user_data["state"] = STATE_NONE
 
-# ====== BALAS KE USER (XL DOR, BUKAN TOP UP) ======
-await update.message.reply_text(
-    (
-        "📦 *Permintaan XL Dor diterima*\n\n"
-        f"📱 Nomor: {trx.keterangan}\n"
-        f"📦 Paket: {trx.item_nama}\n"
-        f"💰 Harga: Rp{trx.harga:,}\n\n"
-        "⏳ Status: *Menunggu admin memproses*"
-    ),
-    parse_mode="Markdown"
-)
-
-# bersihkan state input nomor
-context.user_data["state"] = STATE_NONE
-
 # ================== ADMIN: APPROVE TOP UP ==================
 async def adminapprove_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
