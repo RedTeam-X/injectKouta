@@ -1116,10 +1116,9 @@ async def adminreject(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== MENU TOP UP ==================
 async def menu_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Top Up Sekarang", callback_data="topup_start")]]
+    context.user_data["topup_mode"] = True
     await update.message.reply_text(
-        f"💰 Minimal Top Up Rp {MIN_TOPUP:,}",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
     )
 
 # ================== PROSES TOP UP ==================
@@ -1130,60 +1129,66 @@ async def topup_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["topup_step"] = "ask_nominal"
 
 async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("topup_step") == "ask_nominal":
-        try:
-            nominal = int(update.message.text)
-            if nominal < MIN_TOPUP:
-                await update.message.reply_text(f"❌ Minimal Top Up Rp {MIN_TOPUP:,}")
-                return
+    # Pastikan mode topup aktif
+    if not context.user_data.get("topup_mode"):
+        return
 
-            kode_transaksi = f"TOPUP-{uuid.uuid4().hex[:6].upper()}"
-            user = update.effective_user
+    text = update.message.text.strip()
+    if not text.isdigit():
+        await update.message.reply_text("❌ Nominal harus angka.")
+        return
 
-            # Simpan transaksi ke DB
-            session = SessionLocal()
-            trx = Topup(
-                user_id=str(user.id),
-                username=user.username or str(user.id),
-                nominal=nominal,
-                kode_transaksi=kode_transaksi,
-                status="pending"
-            )
-            session.add(trx)
-            session.commit()
-            trx_id = trx.id
-            session.close()
+    amount = int(text)
+    if amount < MIN_TOPUP:
+        await update.message.reply_text(f"❌ Minimal Top Up Rp {MIN_TOPUP:,}")
+        return
 
-            # Kirim tiket ke admin
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=(
-                    f"🔔 Transaksi Top Up Baru\n\n"
-                    f"🧾 ID: {trx_id}\n"
-                    f"👤 Username: @{trx.username}\n"
-                    f"🆔 Telegram ID: {trx.user_id}\n"
-                    f"💰 Nominal: Rp {trx.nominal:,}\n"
-                    f"🔑 Kode Transaksi: {trx.kode_transaksi}\n\n"
-                    f"Pilih aksi:"
-                ),
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_topup_{trx_id}"),
-                        InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_topup_{trx_id}")
-                    ]
-                ])
-            )
+    # Buat kode transaksi
+    trx_code = f"TOPUP-{uuid.uuid4().hex[:6].upper()}"
+    user = update.effective_user
 
-            # Balas ke user
-            await update.message.reply_text(
-                f"✅ Permintaan Top Up Rp {nominal:,} sudah dicatat.\n"
-                f"Tunggu admin mengirim QRIS untuk pembayaran."
-            )
+    session = SessionLocal()
+    member = get_or_create_member(session, user)
 
-            context.user_data["topup_step"] = None
+    topup = Topup(
+        member_id=member.id,
+        trx_code=trx_code,
+        amount=amount,
+        status="pending"
+    )
+    session.add(topup)
+    session.commit()
+    trx_id = topup.id
+    session.close()
 
-        except ValueError:
-            await update.message.reply_text("❌ Nominal harus angka.")
+    # Kirim tiket ke admin
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"🔔 Transaksi Top Up Baru\n\n"
+            f"🧾 ID: {trx_id}\n"
+            f"👤 User: {member.username}\n"
+            f"🆔 Telegram ID: {member.telegram_id}\n"
+            f"💰 Nominal: Rp {amount:,}\n"
+            f"🔑 Kode Transaksi: {trx_code}\n\n"
+            f"Pilih aksi:"
+        ),
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_topup_{trx_id}"),
+                InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_topup_{trx_id}")
+            ]
+        ]),
+        parse_mode="Markdown"
+    )
+
+    # Balas ke user
+    await update.message.reply_text(
+        f"✅ Permintaan Top Up Rp {amount:,} sudah dicatat.\n"
+        f"Tunggu admin memverifikasi pembayaran."
+    )
+
+    context.user_data["topup_mode"] = False
 
 # ================== ADMIN: APPROVE TOP UP ==================
 async def adminapprove_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
