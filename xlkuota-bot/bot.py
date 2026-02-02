@@ -821,8 +821,7 @@ async def adminapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"✅ Transaksi {trx_id} berhasil di-approve.")
 
     finally:
-        session
-        .close()       
+        session.close()       
         
 # ---------- LOGIN ----------
     if text.lower() == "login":
