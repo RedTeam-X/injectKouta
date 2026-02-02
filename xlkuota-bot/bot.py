@@ -451,6 +451,7 @@ async def callback_xldor_kategori(update: Update, context: ContextTypes.DEFAULT_
 # ================== XL DOR: PROSES NOMOR ==================
 async def proses_xldor_nomor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nomor = update.message.text.strip()
+    tg_user = update.effective_user
 
     if not is_valid_phone(nomor):
         await update.message.reply_text("❌ Nomor tidak valid. Masukkan nomor yang benar.")
@@ -468,13 +469,17 @@ async def proses_xldor_nomor(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text("❌ Item XL Dor tidak ditemukan.")
             return
 
-        # ✅ BUAT TRANSAKSI DI SINI (WAJIB)
+        # simpan ke variabel SEBELUM session ditutup
+        item_nama = item.nama_item
+        item_harga = item.harga
+        item_kategori = item.kategori
+
         trx = Transaction(
-            user_id=str(update.effective_user.id),
+            user_id=str(tg_user.id),
             jenis="XLDOR",
             item_id=item.id,
-            item_nama=item.nama_item,
-            harga=item.harga,
+            item_nama=item_nama,
+            harga=item_harga,
             status="pending",
             keterangan=nomor
         )
@@ -485,23 +490,37 @@ async def proses_xldor_nomor(update: Update, context: ContextTypes.DEFAULT_TYPE)
     finally:
         session.close()
 
-    text = (
-        f"🛒 *Konfirmasi Pembelian XL Dor*\n\n"
-        f"📱 Nomor: {nomor}\n"
-        f"📦 {item.nama_item}\n"
-        f"💰 Harga: Rp{int(item.harga):,}\n\n"
-        f"Jika setuju, admin akan memproses pembelian."
+    # ====== KIRIM KE ADMIN (WAJIB) ======
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"📩 *Tiket Pembelian XL Dor*\n\n"
+            f"🧾 ID: {trx_id}\n"
+            f"👤 User: {tg_user.full_name} (ID: {tg_user.id})\n"
+            f"📱 Nomor: {nomor}\n"
+            f"📦 Paket: {item_nama}\n"
+            f"💰 Harga: Rp{int(item_harga):,}\n"
+            f"📌 Status: pending"
+        ),
+        reply_markup=InlineKeyboardMarkup(
+            [[
+                InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_{trx_id}"),
+                InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_{trx_id}")
+            ]]
+        ),
+        parse_mode="Markdown"
     )
 
-    keyboard = [
-        [InlineKeyboardButton("✔️ Setuju", callback_data=f"xldorconfirm_{trx_id}")],
-        [InlineKeyboardButton("❌ Batal", callback_data=f"xldorcat_{item.kategori}")],
-    ]
-
+    # ====== KONFIRMASI KE USER ======
     await update.message.reply_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown",
+        (
+            "🛒 *Konfirmasi Pembelian XL Dor*\n\n"
+            f"📱 Nomor: {nomor}\n"
+            f"📦 {item_nama}\n"
+            f"💰 Harga: Rp{int(item_harga):,}\n\n"
+            "⏳ Status: *Menunggu admin memproses*"
+        ),
+        parse_mode="Markdown"
     )
 
     context.user_data["state"] = STATE_NONE
