@@ -787,6 +787,115 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = STATE_NONE
         session.close()
         return
+# ---------- TOP UP: INPUT NOMINAL ----------
+    if context.user_data.get("topup_mode"):
+        nominal_text = text.replace("Rp", "").replace(".", "").replace(",", "").strip()
+
+        if not nominal_text.isdigit():
+            await update.message.reply_text(
+                "❌ Nominal tidak valid. Masukkan angka saja."
+            )
+            session.close()
+            return
+
+        nominal = int(nominal_text)
+
+        if nominal < MIN_TOPUP:
+            await update.message.reply_text(
+                f"❌ Minimal Top Up adalah Rp{MIN_TOPUP:,}."
+            )
+            session.close()
+            return
+
+        # ====== BUAT DATA TOP UP ======
+        topup = Topup(
+            member_id=member.id,
+            trx_code=f"TOPUP-{int(time.time())}",
+            amount=nominal,
+            status="pending"
+        )
+        session.add(topup)
+        session.commit()
+
+        # ====== KIRIM TIKET KE ADMIN ======
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                f"📩 *Tiket Top Up Baru*\n\n"
+                f"🧾 Kode: {topup.trx_code}\n"
+                f"👤 User: {member.username or member.telegram_id}\n"
+                f"🆔 User ID: {member.telegram_id}\n"
+                f"💰 Nominal: Rp{nominal:,}\n"
+                f"📌 Status: pending\n\n"
+                f"Gunakan perintah:\n"
+                f"`/addsaldo {member.telegram_id} {nominal}`"
+            ),
+            parse_mode="Markdown"
+        )
+
+        await update.message.reply_text(
+            (
+                "✅ Permintaan Top Up diterima.\n\n"
+                f"💰 Nominal: Rp{nominal:,}\n"
+                "⏳ Menunggu admin memproses saldo."
+            )
+        )
+
+        context.user_data["topup_mode"] = False
+        session.close()
+        return  
+        
+# ================== ADMIN: TAMBAH SALDO ==================
+async def admin_addsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        return
+
+    try:
+        user_id = context.args[0]
+        nominal = int(context.args[1])
+    except:
+        await update.message.reply_text(
+            "❌ Format salah.\nGunakan:\n/addsaldo <user_id> <nominal>"
+        )
+        return
+
+    session = SessionLocal()
+    try:
+        member = session.query(Member).filter_by(telegram_id=user_id).first()
+        if not member:
+            await update.message.reply_text("❌ User tidak ditemukan.")
+            return
+
+        member.saldo += nominal
+
+        topup = (
+            session.query(Topup)
+            .filter_by(member_id=member.id, amount=nominal, status="pending")
+            .order_by(Topup.id.desc())
+            .first()
+        )
+
+        if topup:
+            topup.status = "approved"
+
+        session.commit()
+
+        await update.message.reply_text(
+            f"✅ Saldo user {user_id} berhasil ditambah Rp{nominal:,}."
+        )
+
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=(
+                "🎉 *Top Up Berhasil!*\n\n"
+                f"💰 Saldo bertambah: Rp{nominal:,}\n"
+                f"💳 Saldo sekarang: Rp{int(member.saldo):,}"
+            ),
+            parse_mode="Markdown"
+        )
+
+    finally:
+        session.close()        
 
     # ---------- STATE: INPUT NOMOR PPOB ----------
     if state == STATE_PPOB_NUMBER:
@@ -1317,6 +1426,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
     application.add_handler(MessageHandler(filters.Document.ALL, import_file))
+    application.add_handler(CommandHandler("addsaldo", admin_addsaldo))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
