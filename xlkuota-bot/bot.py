@@ -44,7 +44,6 @@ STATE_NONE = "none"
 STATE_LAPOR_BUG = "lapor_bug"
 STATE_HUBUNGI_ADMIN = "hubungi_admin"
 STATE_INPUT_NOMOR_XLDOR = "input_nomor_xldor"
-STATE_TOPUP_AMOUNT = "topup_amount"
 STATE_PPOB_NUMBER = "ppob_number"
 
 
@@ -538,6 +537,39 @@ async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         session.close()
         
+        # ================== ADMIN: SET SALDO ==================
+async def set_saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("❌ Kamu tidak punya izin.")
+        return
+
+    if len(context.args) != 2:
+        await update.message.reply_text("❌ Format salah.\nGunakan: /setsaldo <telegram_id> <jumlah>")
+        return
+
+    telegram_id = context.args[0]
+    try:
+        jumlah = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text("❌ Jumlah saldo harus angka.")
+        return
+
+    session = SessionLocal()
+    try:
+        member = session.query(Member).filter_by(telegram_id=str(telegram_id)).first()
+        if not member:
+            await update.message.reply_text(f"❌ Member dengan ID {telegram_id} tidak ditemukan.")
+            return
+
+        member.saldo = jumlah
+        session.commit()
+
+        await update.message.reply_text(
+            f"✅ Saldo user {member.username} (ID: {telegram_id}) berhasil diubah menjadi Rp{jumlah:,}"
+        )
+    finally:
+        session.close()
+        
 # ================== TAMPILKAN PPOB ITEMS ==================
 async def tampilkan_ppob_items(sender, kategori):
     session = SessionLocal()
@@ -939,58 +971,7 @@ async def validate_otp(update: Update, context: ContextTypes.DEFAULT_TYPE, membe
         parse_mode="Markdown"
     )
     return False
-
-
-# ================== HANDLE FOTO (TOP-UP) ==================
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    session = SessionLocal()
-    tg_user = update.effective_user
-    member = get_or_create_member(session, tg_user)
-
-    if not context.user_data.get("topup_mode", False):
-        await update.message.reply_text("❌ Kamu tidak sedang melakukan top-up.")
-        session.close()
-        return
-
-    trx_code = f"TOPUP-{member.id}-{int(datetime.datetime.utcnow().timestamp())}"
-
-    bukti_path = generate_bukti_topup_image(
-        trx_code,
-        member.username,
-        member.telegram_id
-    )
-
-    topup = Topup(
-        member_id=member.id,
-        trx_code=trx_code,
-        status="pending"
-    )
-    session.add(topup)
-    session.commit()
-    session.close()
-
-    if os.path.exists(bukti_path):
-        with open(bukti_path, "rb") as f:
-            await context.bot.send_photo(
-                chat_id=ADMIN_CHAT_ID,
-                photo=f,
-                caption=(
-                    "📥 *Bukti Transaksi Top-Up Baru*\n"
-                    f"ID: `{trx_code}`\n"
-                    f"User: {member.username} (ID: {member.telegram_id})\n\n"
-                    "Gunakan:\n"
-                    f"/approve_topup {trx_code} <jumlah>\n"
-                    f"/reject_topup {trx_code}"
-                ),
-                parse_mode="Markdown"
-            )
-
-    await update.message.reply_text(
-        "📨 Bukti transfer sudah dikirim ke admin.\nMohon tunggu verifikasi.",
-        parse_mode="Markdown"
-    )
-
-    context.user_data["topup_mode"] = False
+    
 # ================== ADMIN: APPROVE TRANSAKSI (PPOB & XL DOR) ==================
 async def adminapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1080,13 +1061,7 @@ async def menu_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
     )
 
-# ================== PROSES TOP UP ==================
-async def topup_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.message.reply_text("Masukkan nominal Top Up (contoh: 50000):")
-    context.user_data["topup_step"] = "ask_nominal"
-
+# ================== NOMINAL TOP UP ==================
 async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Pastikan mode topup aktif
     if not context.user_data.get("topup_mode"):
@@ -1298,10 +1273,10 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
     application.add_handler(MessageHandler(filters.Document.ALL, import_file))
+    application.add_handler(CommandHandler("setsaldo", set_saldo))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     # ---------- PPOB ----------
     application.add_handler(CallbackQueryHandler(menu_ppob, pattern="^menu_ppob$"))
@@ -1317,7 +1292,7 @@ def main():
     application.add_handler(CallbackQueryHandler(callback_xldor_confirm, pattern="^xldorconfirm_"))
 
     # ---------- TOP UP ----------
-    application.add_handler(CallbackQueryHandler(topup_start, pattern="^topup_start$"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_nominal))
 
     # --- ADMIN: Approve/Reject Top Up ---
     application.add_handler(CallbackQueryHandler(adminapprove_topup, pattern="^adminapprove_topup_"))
