@@ -1095,26 +1095,26 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
     trx_id = topup.id
     session.close()
 
-    # Kirim tiket ke admin
-    await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=(
-            f"🔔 Transaksi Top Up Baru\n\n"
-            f"🧾 ID: {trx_id}\n"
-            f"👤 User: {member.username}\n"
-            f"🆔 Telegram ID: {member.telegram_id}\n"
-            f"💰 Nominal: Rp {amount:,}\n"
-            f"🔑 Kode Transaksi: {trx_code}\n\n"
-            f"Pilih aksi:"
-        ),
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_topup_{trx_id}"),
-                InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_topup_{trx_id}")
-            ]
-        ]),
-        parse_mode="Markdown"
-    )
+  # ====== KIRIM TIKET KE ADMIN ======
+  await context.bot.send_message(
+    chat_id=ADMIN_CHAT_ID,
+    text=(
+        f"📩 *Tiket Pembelian XL Dor*\n\n"
+        f"🧾 ID Transaksi: {trx_id}\n"
+        f"👤 User: {tg_user.full_name} (ID: {tg_user.id})\n"
+        f"📱 Nomor: {trx.keterangan}\n"
+        f"📦 Item: {trx.item_nama}\n"
+        f"💰 Harga: Rp{trx.harga:,}\n\n"
+        f"Pilih aksi:"
+    ),
+    reply_markup=InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_{trx_id}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_{trx_id}")
+        ]
+    ]),
+    parse_mode="Markdown"
+)
 
     # Balas ke user
     await update.message.reply_text(
