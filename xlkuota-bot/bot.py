@@ -371,39 +371,45 @@ async def callback_xldor_confirm(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
-    trx_id = query.data.replace("xldorconfirm_", "")
+    trx_id = int(query.data.replace("xldorconfirm_", ""))
+    tg_user = query.from_user
 
     session = SessionLocal()
     try:
-        trx = session.query(Transaction).filter_by(id=trx_id).first()
+        trx = session.query(Transaction).filter_by(id=trx_id, status="pending").first()
         if not trx:
-            await query.edit_message_text("❌ Transaksi tidak ditemukan.")
+            await query.edit_message_text("❌ Transaksi tidak ditemukan / sudah diproses.")
             return
 
-        # Ambil item dari DB
-        item = session.query(XLDorItem).filter_by(id=trx.item_id).first()
-        if not item:
-            await query.edit_message_text("❌ Item tidak ditemukan.")
-            return
+        # Kirim tiket ke admin
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                f"📩 *Tiket Pembelian XL Dor*\n\n"
+                f"🧾 ID: {trx.id}\n"
+                f"👤 User: {tg_user.full_name} (ID: {tg_user.id})\n"
+                f"📱 Nomor: {trx.keterangan}\n"
+                f"📦 Paket: {trx.item_nama}\n"
+                f"💰 Harga: Rp{trx.harga:,}\n\n"
+                f"Pilih aksi:"
+            ),
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_{trx.id}"),
+                    InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_{trx.id}")
+                ]
+            ]),
+            parse_mode="Markdown"
+        )
 
-        # Simpan field ke variabel sebelum session ditutup
-        item_nama = item.nama_item
-        item_harga = item.harga
+        await query.edit_message_text(
+            "📦 *Permintaan XL Dor diterima*\n"
+            "⏳ Status: *Menunggu admin memproses*",
+            parse_mode="Markdown"
+        )
 
     finally:
         session.close()
-
-    # Gunakan variabel, bukan objek item
-    await query.edit_message_text(
-    (
-        "📦 *Permintaan XL Dor Diterima*\n\n"
-        f"📱 Nomor: {trx.keterangan}\n"
-        f"📦 Item: {item_nama}\n"
-        f"💰 Harga: Rp{int(item_harga):,}\n\n"
-        "⏳ Status: *Menunggu admin memproses*"
-    ),
-    parse_mode="Markdown"
-)
 
 
 # ================== XL DOR: KATEGORI → ITEM ==================
@@ -538,35 +544,49 @@ async def clear_xldor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session.close()
         
         # ================== ADMIN: SET SALDO ==================
-async def set_saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def setsaldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("❌ Kamu tidak punya izin.")
         return
 
-    if len(context.args) != 2:
-        await update.message.reply_text("❌ Format salah.\nGunakan: /setsaldo <telegram_id> <jumlah>")
-        return
-
-    telegram_id = context.args[0]
     try:
-        jumlah = int(context.args[1])
-    except ValueError:
-        await update.message.reply_text("❌ Jumlah saldo harus angka.")
+        user_id = context.args[0]
+        amount = int(context.args[1])
+    except:
+        await update.message.reply_text(
+            "❌ Format:\n/setsaldo <telegram_id> <jumlah>"
+        )
         return
 
     session = SessionLocal()
     try:
-        member = session.query(Member).filter_by(telegram_id=str(telegram_id)).first()
+        member = session.query(Member).filter_by(telegram_id=user_id).first()
         if not member:
-            await update.message.reply_text(f"❌ Member dengan ID {telegram_id} tidak ditemukan.")
+            await update.message.reply_text("❌ User tidak ditemukan.")
             return
 
-        member.saldo = jumlah
+        member.saldo += amount
+
+        topup = (
+            session.query(Topup)
+            .filter_by(member_id=member.id, status="pending")
+            .order_by(Topup.id.desc())
+            .first()
+        )
+        if topup:
+            topup.status = "approved"
+
         session.commit()
 
         await update.message.reply_text(
-            f"✅ Saldo user {member.username} (ID: {telegram_id}) berhasil diubah menjadi Rp{jumlah:,}"
+            f"✅ Saldo user {user_id} bertambah Rp{amount:,}.\n"
+            f"Saldo sekarang: Rp{int(member.saldo):,}"
         )
+
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=f"🎉 Saldo kamu bertambah Rp{amount:,}.\nSaldo sekarang: Rp{int(member.saldo):,}"
+        )
+
     finally:
         session.close()
         
@@ -865,36 +885,73 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await menu_xldor(update, context)
         session.close()
         return
-
+    # ---------- PPOB ----------
     if text.lower() == "ppob":
         await menu_ppob(update, context)
         session.close()
         return
-
+    # ---------- Lapor Masalah ----------
     if text.lower() == "lapor masalah":
         context.user_data["state"] = STATE_LAPOR_BUG
         await update.message.reply_text("📝 Silakan tulis laporan kamu.")
         session.close()
         return
-
+    # ---------- Hubungi Admin ----------
     if text.lower() == "hubungi admin":
         context.user_data["state"] = STATE_HUBUNGI_ADMIN
         await update.message.reply_text("✉️ Tulis pesan untuk admin.")
         session.close()
         return
-
+    # ---------- CEK SALDO ----------
     if text.lower() == "cek saldo":
         await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
         session.close()
         return
 
-    if text.lower() == "top up saldo":
-        context.user_data["topup_mode"] = True
-        await update.message.reply_text(
-            f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
-        )
+    # ---------- TOP UP MODE ----------
+    if context.user_data.get("topup_mode"):
+       nominal_text = text.replace("Rp", "").replace(".", "").replace(",", "").strip()
+
+    if not nominal_text.isdigit():
+        await update.message.reply_text("❌ Nominal harus angka.")
         session.close()
         return
+
+    nominal = int(nominal_text)
+    if nominal < MIN_TOPUP:
+        await update.message.reply_text(f"❌ Minimal Top Up Rp{MIN_TOPUP:,}")
+        session.close()
+        return
+
+    topup = Topup(
+        member_id=member.id,
+        trx_code=f"TOPUP-{int(time.time())}",
+        amount=nominal,
+        status="pending"
+    )
+    session.add(topup)
+    session.commit()
+
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"📩 *Tiket Top Up*\n\n"
+            f"👤 User: {member.telegram_id}\n"
+            f"💰 Nominal: Rp{nominal:,}\n\n"
+            f"Gunakan:\n"
+            f"`/setsaldo {member.telegram_id} {nominal}`"
+        ),
+        parse_mode="Markdown"
+    )
+
+    await update.message.reply_text(
+        "✅ Permintaan Top Up dicatat.\n"
+        "⏳ Menunggu admin memproses."
+    )
+
+    context.user_data["topup_mode"] = False
+    session.close()
+    return
     # ---------- DEFAULT ----------
     await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
     session.close()
@@ -977,36 +1034,46 @@ async def adminapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Hanya admin
     if query.from_user.id != ADMIN_CHAT_ID:
         return
 
-    trx_id = query.data.replace("adminapprove_", "")
+    trx_id = int(query.data.replace("adminapprove_", ""))
 
     session = SessionLocal()
     try:
-        trx = session.query(Transaction).filter_by(id=trx_id).first()
-
-        if not trx or trx.status != "pending":
-            await query.edit_message_text("❌ Transaksi tidak ditemukan / bukan pending.")
+        trx = session.query(Transaction).filter_by(id=trx_id, status="pending").first()
+        if not trx:
+            await query.edit_message_text("❌ Transaksi tidak valid.")
             return
 
-        trx.status = "success"
-        trx.keterangan = "Disetujui admin"
+        member = session.query(Member).filter_by(telegram_id=trx.user_id).first()
+        if not member:
+            await query.edit_message_text("❌ User tidak ditemukan.")
+            return
+
+        if member.saldo < trx.harga:
+            await query.edit_message_text("❌ Saldo user tidak cukup.")
+            return
+
+        # POTONG SALDO
+        member.saldo -= trx.harga
+        member.transaksi += 1
+
+        trx.status = "sukses"
         session.commit()
 
-        # Beri tahu user
         await context.bot.send_message(
             chat_id=int(trx.user_id),
             text=(
-                f"🎉 Transaksi {trx.jenis} *{trx.item_nama}* berhasil diproses!\n"
-                f"Status: Sukses."
+                f"🎉 *Transaksi Berhasil!*\n\n"
+                f"📦 {trx.item_nama}\n"
+                f"💰 Harga: Rp{trx.harga:,}\n"
+                f"💳 Sisa saldo: Rp{int(member.saldo):,}"
             ),
             parse_mode="Markdown"
         )
 
-        # Balas admin
-        await query.edit_message_text(f"✅ Transaksi {trx_id} berhasil di-approve.")
+        await query.edit_message_text("✔️ Transaksi berhasil di-approve.")
 
     finally:
         session.close()
@@ -1017,40 +1084,29 @@ async def adminreject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Hanya admin
     if query.from_user.id != ADMIN_CHAT_ID:
         return
 
-    trx_id = query.data.replace("adminreject_", "")
+    trx_id = int(query.data.replace("adminreject_", ""))
 
     session = SessionLocal()
     try:
-        trx = session.query(Transaction).filter_by(id=trx_id).first()
-
-        if not trx or trx.status != "pending":
-            await query.edit_message_text("❌ Transaksi tidak ditemukan / bukan pending.")
+        trx = session.query(Transaction).filter_by(id=trx_id, status="pending").first()
+        if not trx:
+            await query.edit_message_text("❌ Transaksi tidak valid.")
             return
 
         trx.status = "gagal"
         trx.keterangan = "Ditolak admin"
         session.commit()
 
-        # ✅ Beri tahu user
-        try:
-            await context.bot.send_message(
-                chat_id=int(trx.user_id),
-                text=(
-                    f"❌ Transaksi {trx.jenis} *{trx.item_nama}* ditolak admin.\n"
-                    "Silakan pilih paket lain."
-                ),
-                parse_mode="Markdown"
-            )
-        except Exception:
-            # user mungkin blok bot / chat tidak valid
-            pass
+        await context.bot.send_message(
+            chat_id=int(trx.user_id),
+            text=f"❌ Transaksi *{trx.item_nama}* ditolak admin.",
+            parse_mode="Markdown"
+        )
 
-        # ✅ Balas admin
-        await query.edit_message_text(f"❌ Transaksi {trx_id} ditolak.")
+        await query.edit_message_text("❌ Transaksi ditolak.")
 
     finally:
         session.close()
@@ -1096,9 +1152,9 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
     session.close()
 
 # ====== KIRIM TIKET KE ADMIN ======
-await context.bot.send_message(
-    chat_id=ADMIN_CHAT_ID,
-    text=(
+    await context.bot.send_message(
+      chat_id=ADMIN_CHAT_ID,
+      text=(
         f"📩 *Tiket Pembelian XL Dor*\n\n"
         f"🧾 ID Transaksi: {trx_id}\n"
         f"👤 User: {tg_user.full_name} (ID: {tg_user.id})\n"
@@ -1115,6 +1171,21 @@ await context.bot.send_message(
     ]),
     parse_mode="Markdown"
 )
+
+# ====== BALAS KE USER (XL DOR, BUKAN TOP UP) ======
+await update.message.reply_text(
+    (
+        "📦 *Permintaan XL Dor diterima*\n\n"
+        f"📱 Nomor: {trx.keterangan}\n"
+        f"📦 Paket: {trx.item_nama}\n"
+        f"💰 Harga: Rp{trx.harga:,}\n\n"
+        "⏳ Status: *Menunggu admin memproses*"
+    ),
+    parse_mode="Markdown"
+)
+
+# bersihkan state input nomor
+context.user_data["state"] = STATE_NONE
 
 # ====== BALAS KE USER (XL DOR, BUKAN TOP UP) ======
 await update.message.reply_text(
