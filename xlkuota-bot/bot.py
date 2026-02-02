@@ -1172,9 +1172,9 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
     parse_mode="Markdown"
 )
 
-# ====== BALAS KE USER (XL DOR, BUKAN TOP UP) ======
-await update.message.reply_text(
-    (
+# ====== BALAS KE USER (XL DOR) ======
+     await update.message.reply_text(
+        (
         "📦 *Permintaan XL Dor diterima*\n\n"
         f"📱 Nomor: {trx.keterangan}\n"
         f"📦 Paket: {trx.item_nama}\n"
