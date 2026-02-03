@@ -754,8 +754,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text.strip()
+    tg_user = update.effective_user
+    user_id = str(tg_user.id)
+
     session = SessionLocal()
-    member = get_or_create_member(session, update.effective_user)
+    member = get_or_create_member(session, tg_user)
+
+    state = context.user_data.get("state", STATE_NONE)
+
 
     # ---------- LOGIN ----------
     if text.lower() == "login":
