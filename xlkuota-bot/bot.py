@@ -1119,7 +1119,6 @@ async def menu_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== NOMINAL TOP UP ==================
 async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Pastikan mode topup aktif
     if not context.user_data.get("topup_mode"):
         return
 
@@ -1130,62 +1129,46 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
 
     amount = int(text)
     if amount < MIN_TOPUP:
-        await update.message.reply_text(f"❌ Minimal Top Up Rp {MIN_TOPUP:,}")
+        await update.message.reply_text(f"❌ Minimal Top Up Rp{MIN_TOPUP:,}")
         return
 
-    # Buat kode transaksi
     trx_code = f"TOPUP-{uuid.uuid4().hex[:6].upper()}"
     user = update.effective_user
 
     session = SessionLocal()
-    member = get_or_create_member(session, user)
+    try:
+        member = get_or_create_member(session, user)
 
-    topup = Topup(
-        member_id=member.id,
-        trx_code=trx_code,
-        amount=amount,
-        status="pending"
-    )
-    session.add(topup)
-    session.commit()
-    trx_id = topup.id
-    session.close()
+        topup = Topup(
+            member_id=member.id,
+            trx_code=trx_code,
+            amount=amount,
+            status="pending"
+        )
+        session.add(topup)
+        session.commit()
 
-# ====== KIRIM TIKET KE ADMIN ======
-    await context.bot.send_message(
-      chat_id=ADMIN_CHAT_ID,
-      text=(
-        f"📩 *Tiket Pembelian XL Dor*\n\n"
-        f"🧾 ID Transaksi: {trx_id}\n"
-        f"👤 User: {tg_user.full_name} (ID: {tg_user.id})\n"
-        f"📱 Nomor: {trx.keterangan}\n"
-        f"📦 Item: {trx.item_nama}\n"
-        f"💰 Harga: Rp{trx.harga:,}\n\n"
-        f"Pilih aksi:"
-    ),
-    reply_markup=InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✔ Approve", callback_data=f"adminapprove_{trx_id}"),
-            InlineKeyboardButton("❌ Reject", callback_data=f"adminreject_{trx_id}")
-        ]
-    ]),
-    parse_mode="Markdown"
-)
-
-        # ====== BALAS KE USER (XL DOR) ======
-        await update.message.reply_text(
-            (
-                "📦 *Permintaan XL Dor diterima*\n\n"
-                f"📱 Nomor: {trx.keterangan}\n"
-                f"📦 Paket: {trx.item_nama}\n"
-                f"💰 Harga: Rp{trx.harga:,}\n\n"
-                "⏳ Status: *Menunggu admin memproses*"
+        # kirim tiket ke admin (TANPA BUTTON)
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                f"📩 *Tiket Top Up Baru*\n\n"
+                f"🧾 Kode: {trx_code}\n"
+                f"👤 User: {member.username or member.telegram_id}\n"
+                f"🆔 Telegram ID: {member.telegram_id}\n"
+                f"💰 Nominal: Rp{amount:,}\n\n"
+                f"Gunakan perintah:\n"
+                f"`/setsaldo {member.telegram_id} {amount}`"
             ),
             parse_mode="Markdown"
         )
 
-        # reset state
-        context.user_data["state"] = STATE_NONE
+        await update.message.reply_text(
+            f"✅ Permintaan Top Up Rp{amount:,} sudah dicatat.\n"
+            "⏳ Menunggu admin memproses saldo."
+        )
+
+        context.user_data["topup_mode"] = False
 
     finally:
         session.close()
