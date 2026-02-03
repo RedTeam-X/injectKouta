@@ -881,34 +881,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         session.close()
         return
-# ---------- MENU TEKS ----------
-    if text.lower() == "xl dor":
-        await menu_xldor(update, context)
-        session.close()
-        return
-    # ---------- PPOB ----------
-    if text.lower() == "ppob":
-        await menu_ppob(update, context)
-        session.close()
-        return
-    # ---------- Lapor Masalah ----------
-    if text.lower() == "lapor masalah":
-        context.user_data["state"] = STATE_LAPOR_BUG
-        await update.message.reply_text("📝 Silakan tulis laporan kamu.")
-        session.close()
-        return
-    # ---------- Hubungi Admin ----------
-    if text.lower() == "hubungi admin":
-        context.user_data["state"] = STATE_HUBUNGI_ADMIN
-        await update.message.reply_text("✉️ Tulis pesan untuk admin.")
-        session.close()
-        return
-    # ---------- CEK SALDO ----------
-    if text.lower() == "cek saldo":
-        await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
-        session.close()
-        return
-
     # ---------- TOP UP MODE ----------
     if context.user_data.get("topup_mode"):
 
@@ -962,6 +934,34 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["topup_mode"] = False
         session.close()
         return
+# ---------- MENU TEKS ----------
+    if text.lower() == "xl dor":
+        await menu_xldor(update, context)
+        session.close()
+        return
+    # ---------- PPOB ----------
+    if text.lower() == "ppob":
+        await menu_ppob(update, context)
+        session.close()
+        return
+    # ---------- Lapor Masalah ----------
+    if text.lower() == "lapor masalah":
+        context.user_data["state"] = STATE_LAPOR_BUG
+        await update.message.reply_text("📝 Silakan tulis laporan kamu.")
+        session.close()
+        return
+    # ---------- Hubungi Admin ----------
+    if text.lower() == "hubungi admin":
+        context.user_data["state"] = STATE_HUBUNGI_ADMIN
+        await update.message.reply_text("✉️ Tulis pesan untuk admin.")
+        session.close()
+        return
+    # ---------- CEK SALDO ----------
+    if text.lower() == "cek saldo":
+        await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
+        session.close()
+        return
+
     # ---------- DEFAULT ----------
     await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
     session.close()
