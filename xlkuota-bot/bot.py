@@ -908,9 +908,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session.close()
         return
 
-    # ---------- TOP UP MODE ----------
-    if context.user_data.get("topup_mode"):
-       nominal_text = text.replace("Rp", "").replace(".", "").replace(",", "").strip()
+# ---------- TOP UP MODE ----------
+if context.user_data.get("topup_mode"):
+
+    nominal_text = (
+        text.replace("Rp", "")
+        .replace(".", "")
+        .replace(",", "")
+        .strip()
+    )
 
     if not nominal_text.isdigit():
         await update.message.reply_text("❌ Nominal harus angka.")
@@ -918,8 +924,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     nominal = int(nominal_text)
+
     if nominal < MIN_TOPUP:
-        await update.message.reply_text(f"❌ Minimal Top Up Rp{MIN_TOPUP:,}")
+        await update.message.reply_text(
+            f"❌ Minimal Top Up Rp{MIN_TOPUP:,}"
+        )
         session.close()
         return
 
