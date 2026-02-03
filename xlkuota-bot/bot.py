@@ -1322,7 +1322,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
     application.add_handler(MessageHandler(filters.Document.ALL, import_file))
-    application.add_handler(CommandHandler("setsaldo", set_saldo))
+    application.add_handler(CommandHandler("setsaldo", setsaldo))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
