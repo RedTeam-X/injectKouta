@@ -754,13 +754,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text.strip()
-    tg_user = update.effective_user
-    user_id = str(tg_user.id)
-
     session = SessionLocal()
-    member = get_or_create_member(session, tg_user)
-
-    state = context.user_data.get("state", STATE_NONE)
+    member = get_or_create_member(session, update.effective_user)
 
     # ---------- LOGIN ----------
     if text.lower() == "login":
@@ -908,59 +903,59 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session.close()
         return
 
-# ---------- TOP UP MODE ----------
-if context.user_data.get("topup_mode"):
+    # ---------- TOP UP MODE ----------
+    if context.user_data.get("topup_mode"):
 
-    nominal_text = (
-        text.replace("Rp", "")
-        .replace(".", "")
-        .replace(",", "")
-        .strip()
-    )
-
-    if not nominal_text.isdigit():
-        await update.message.reply_text("❌ Nominal harus angka.")
-        session.close()
-        return
-
-    nominal = int(nominal_text)
-
-    if nominal < MIN_TOPUP:
-        await update.message.reply_text(
-            f"❌ Minimal Top Up Rp{MIN_TOPUP:,}"
+        nominal_text = (
+            text.replace("Rp", "")
+            .replace(".", "")
+            .replace(",", "")
+            .strip()
         )
+
+        if not nominal_text.isdigit():
+            await update.message.reply_text("❌ Nominal harus angka.")
+            session.close()
+            return
+
+        nominal = int(nominal_text)
+
+        if nominal < MIN_TOPUP:
+            await update.message.reply_text(
+                f"❌ Minimal Top Up Rp{MIN_TOPUP:,}"
+            )
+            session.close()
+            return
+
+        topup = Topup(
+            member_id=member.id,
+            trx_code=f"TOPUP-{int(time.time())}",
+            amount=nominal,
+            status="pending"
+        )
+        session.add(topup)
+        session.commit()
+
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=(
+                f"📩 *Tiket Top Up*\n\n"
+                f"👤 User: {member.telegram_id}\n"
+                f"💰 Nominal: Rp{nominal:,}\n\n"
+                f"Gunakan:\n"
+                f"`/setsaldo {member.telegram_id} {nominal}`"
+            ),
+            parse_mode="Markdown"
+        )
+
+        await update.message.reply_text(
+            "✅ Permintaan Top Up dicatat.\n"
+            "⏳ Menunggu admin memproses."
+        )
+
+        context.user_data["topup_mode"] = False
         session.close()
         return
-
-    topup = Topup(
-        member_id=member.id,
-        trx_code=f"TOPUP-{int(time.time())}",
-        amount=nominal,
-        status="pending"
-    )
-    session.add(topup)
-    session.commit()
-
-    await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=(
-            f"📩 *Tiket Top Up*\n\n"
-            f"👤 User: {member.telegram_id}\n"
-            f"💰 Nominal: Rp{nominal:,}\n\n"
-            f"Gunakan:\n"
-            f"`/setsaldo {member.telegram_id} {nominal}`"
-        ),
-        parse_mode="Markdown"
-    )
-
-    await update.message.reply_text(
-        "✅ Permintaan Top Up dicatat.\n"
-        "⏳ Menunggu admin memproses."
-    )
-
-    context.user_data["topup_mode"] = False
-    session.close()
-    return
     # ---------- DEFAULT ----------
     await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
     session.close()
