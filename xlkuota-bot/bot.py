@@ -1172,20 +1172,23 @@ async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYP
     parse_mode="Markdown"
 )
 
-# ====== BALAS KE USER (XL DOR) ======
-     await update.message.reply_text(
-        (
-        "📦 *Permintaan XL Dor diterima*\n\n"
-        f"📱 Nomor: {trx.keterangan}\n"
-        f"📦 Paket: {trx.item_nama}\n"
-        f"💰 Harga: Rp{trx.harga:,}\n\n"
-        "⏳ Status: *Menunggu admin memproses*"
-    ),
-    parse_mode="Markdown"
-)
+        # ====== BALAS KE USER (XL DOR) ======
+        await update.message.reply_text(
+            (
+                "📦 *Permintaan XL Dor diterima*\n\n"
+                f"📱 Nomor: {trx.keterangan}\n"
+                f"📦 Paket: {trx.item_nama}\n"
+                f"💰 Harga: Rp{trx.harga:,}\n\n"
+                "⏳ Status: *Menunggu admin memproses*"
+            ),
+            parse_mode="Markdown"
+        )
 
-# bersihkan state input nomor
-context.user_data["state"] = STATE_NONE
+        # reset state
+        context.user_data["state"] = STATE_NONE
+
+    finally:
+        session.close()
 
 # ================== ADMIN: APPROVE TOP UP ==================
 async def adminapprove_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
