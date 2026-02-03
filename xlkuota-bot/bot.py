@@ -963,8 +963,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------- DEFAULT ----------
-    await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
-    session.close()
+        await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
+        session.close()
 
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
