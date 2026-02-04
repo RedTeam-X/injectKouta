@@ -971,9 +971,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session.close()
         return
  # ---------- DEFAULT ----------        
-        await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
-        session.close()
-        return
+await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
+session.close()
+return
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
     total_member = session.query(Member).count()
@@ -1334,7 +1334,6 @@ def main():
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
     application.add_handler(MessageHandler(filters.Document.ALL, import_file))
     application.add_handler(CommandHandler("setsaldo", setsaldo))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_topup_nominal))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
