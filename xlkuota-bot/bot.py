@@ -957,23 +957,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✉️ Tulis pesan untuk admin.")
         session.close()
         return
-    # ---------- CEK SALDO ----------
-    if text.lower() == "cek saldo":
-        await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
-        session.close()
-        return
-   # ---------- TOP UP SALDO ----------
-   if text.lower() == "top up saldo":
-       context.user_data["topup_mode"] = True
-       await update.message.reply_text(
-        f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
-    )
-    session.close()
-    return
-    # ---------- DEFAULT ----------
-        await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
-        session.close()
-        return
+# ---------- CEK SALDO ----------
+ if text.lower() == "cek saldo":
+     await update.message.reply_text(f"💵 Saldo kamu: Rp{int(member.saldo):,}")
+     session.close()
+     return
+
+ # ---------- TOP UP SALDO ----------
+ if text.lower() == "top up saldo":
+     context.user_data["topup_mode"] = True
+     await update.message.reply_text(
+         f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
+     )
+     session.close()
+     return
+
+ # ---------- DEFAULT ----------
+ await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
+ session.close()
+ return
 
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
