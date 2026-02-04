@@ -473,6 +473,14 @@ async def proses_xldor_nomor(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not item:
             await update.message.reply_text("❌ Item XL Dor tidak ditemukan.")
             return
+            # ✅ CEK SALDO
+        if member.saldo < item.harga:
+            await update.message.reply_text(
+                "❌ Saldo kamu tidak cukup.\n\n"
+                "💡 Yuk top up dulu biar paket incaranmu bisa dibeli!"
+            )
+            session.close()
+            return
 
         # ✅ BUAT TRANSAKSI DI SINI (WAJIB)
         trx = Transaction(
@@ -841,6 +849,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         item = session.query(PPOBItem).filter_by(id=item_id, aktif=True).first()
         if not item:
             await update.message.reply_text("❌ Item PPOB tidak ditemukan.")
+            session.close()
+            return
+            # ✅ CEK SALDO
+        if member.saldo < item.harga:
+            await update.message.reply_text(
+                "❌ Saldo kamu tidak cukup.\n\n"
+                "💡 Yuk top up dulu biar paket incaranmu bisa dibeli!"
+            )
             session.close()
             return
 
