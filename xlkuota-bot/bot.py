@@ -1350,6 +1350,7 @@ def main():
     application.add_handler(CommandHandler("clear_xldor", clear_xldor))
     application.add_handler(MessageHandler(filters.Document.ALL, import_file))
     application.add_handler(CommandHandler("setsaldo", setsaldo))
+    application.add_handler(CommandHandler("broadcast", broadcast))
 
     # ---------- MESSAGE ----------
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
