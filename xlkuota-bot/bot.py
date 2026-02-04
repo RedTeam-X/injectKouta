@@ -972,49 +972,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
  # ---------- DEFAULT ----------
- await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
- session.close()
- return
- # ---------- TOP UP SALDO ----------
- if text.lower() == "top up saldo":
-     context.user_data["topup_mode"] = True
-     await update.message.reply_text(
-         f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
-     )
-     session.close()
-     return
-
- # ---------- DEFAULT ----------
- await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
- session.close()
- return
- # ---------- TOP UP SALDO ----------
- if text.lower() == "top up saldo":
-     context.user_data["topup_mode"] = True
-     await update.message.reply_text(
-         f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
-     )
-     session.close()
-     return
-
- # ---------- DEFAULT ----------
- await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
- session.close()
- return
- # ---------- TOP UP SALDO ----------
- if text.lower() == "top up saldo":
-     context.user_data["topup_mode"] = True
-     await update.message.reply_text(
-         f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
-     )
-     session.close()
-     return
-
- # ---------- DEFAULT ----------
- await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
- session.close()
- return
-
+await update.message.reply_text("❓ Perintah tidak dikenali. Silakan pilih menu.")
+session.close()
+return
     # ---------- LOGIN ----------
 async def handle_login(update: Update, context: ContextTypes.DEFAULT_TYPE, member, session):
     total_member = session.query(Member).count()
