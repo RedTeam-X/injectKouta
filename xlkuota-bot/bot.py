@@ -1129,14 +1129,6 @@ async def adminreject(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     finally:
         session.close()
-# ================== MENU TOP UP ==================
-async def menu_topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-if text.lower() == "top up saldo":
-    context.user_data["topup_mode"] = True
-    await update.message.reply_text(
-        f"💵 Masukkan nominal Top Up (minimal Rp{MIN_TOPUP:,}):"
-    )
-    
 # ================== NOMINAL TOP UP ==================
 async def handle_topup_nominal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("topup_mode"):
